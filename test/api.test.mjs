@@ -107,15 +107,15 @@ test('event admin can set the daily reset time', async () => {
   await admin('PATCH', `/api/events/${eventId}`, { reset_time: '00:00' });
 });
 
-test('excel export and QR endpoints respond', async () => {
+test('excel export responds; standalone QR export is gone', async () => {
   const xlsx = await admin('GET', `/api/events/${eventId}/tickets.xlsx`);
   assert.equal(xlsx.status, 200);
   assert.ok(xlsx.headers.get('content-type').includes('spreadsheetml'));
   assert.ok(xlsx.data.byteLength > 1000);
 
-  const zip = await admin('GET', `/api/sections/${sectionId}/qrcodes.zip`);
-  assert.equal(zip.status, 200);
-  assert.equal(new Uint8Array(zip.data)[0], 0x50); // 'P' of PK zip magic
+  // QR ZIP / print were superseded by the admission card and removed
+  assert.equal((await admin('GET', `/api/sections/${sectionId}/qrcodes.zip`)).status, 404);
+  assert.equal((await admin('GET', `/api/sections/${sectionId}/qrcodes/print`)).status, 404);
 });
 
 test('scan flow: OK, debounce, DOUBLE, ERROR', async () => {
@@ -230,61 +230,62 @@ test('subsections: tickets carry them, scan label shows "Section – Subsection"
   assert.equal((await admin('DELETE', `/api/subsections/${sub.data.id}`)).status, 200);
 });
 
-test('admission card config + backdrop, stored per section (EVENT_ADMIN only)', async () => {
-  assert.equal((await owner('GET', `/api/sections/${sectionId}/card`)).status, 403);
+test('admission card is defined once per event (EVENT_ADMIN only)', async () => {
+  assert.equal((await owner('GET', `/api/events/${eventId}/card`)).status, 403);
 
-  const cfg0 = await admin('GET', `/api/sections/${sectionId}/card`);
+  const cfg0 = await admin('GET', `/api/events/${eventId}/card`);
   assert.equal(cfg0.status, 200);
-  assert.equal(cfg0.data.section, 'Audio Video');
-  assert.match(cfg0.data.color, /^#[0-9a-f]{6}$/i);
+  assert.equal(cfg0.data.event, 'Kongress 2026');
   assert.equal(cfg0.data.has_backdrop, false);
+  assert.equal(cfg0.data.total_tickets, 6); // 5 (Audio Video) + 1 (subsection ticket)
+  assert.match(cfg0.data.sample.color, /^#[0-9a-f]{6}$/i);
 
-  assert.equal((await admin('PUT', `/api/sections/${sectionId}/card`,
-    { title: 'VOREINLASS-AUSWEIS', text: 'Liebe Schwester, lieber Bruder!' })).status, 200);
-  const cfg1 = await admin('GET', `/api/sections/${sectionId}/card`);
+  assert.equal((await admin('PUT', `/api/events/${eventId}/card`,
+    { title: 'VOREINLASS-AUSWEIS', text: 'Liebe Schwester, **lieber** Bruder!' })).status, 200);
+  const cfg1 = await admin('GET', `/api/events/${eventId}/card`);
   assert.equal(cfg1.data.title, 'VOREINLASS-AUSWEIS');
-  assert.equal(cfg1.data.text, 'Liebe Schwester, lieber Bruder!');
+  assert.equal(cfg1.data.text, 'Liebe Schwester, **lieber** Bruder!');
+
+  // flat ticket list for bulk generation carries color + label parts
+  const tickets = (await admin('GET', `/api/events/${eventId}/card/tickets`)).data;
+  assert.equal(tickets.length, 6);
+  assert.ok(tickets.every(t => /^#[0-9a-f]{6}$/i.test(t.color) && t.section === 'Audio Video'));
 
   // upload raw backdrop bytes
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-  const up = await fetch(base + `/api/sections/${sectionId}/card/backdrop`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'image/png', cookie: jars.admin },
-    body: png,
+  const up = await fetch(base + `/api/events/${eventId}/card/backdrop`, {
+    method: 'POST', headers: { 'Content-Type': 'image/png', cookie: jars.admin }, body: png,
   });
   assert.equal(up.status, 201);
-  assert.equal((await admin('GET', `/api/sections/${sectionId}/card`)).data.has_backdrop, true);
+  assert.equal((await admin('GET', `/api/events/${eventId}/card`)).data.has_backdrop, true);
 
-  // serve it back verbatim
-  const img = await fetch(base + `/api/sections/${sectionId}/card/backdrop`, { headers: { cookie: jars.admin } });
+  // serve it back verbatim, and via ?token= for <img>
+  const img = await fetch(base + `/api/events/${eventId}/card/backdrop`, { headers: { cookie: jars.admin } });
   assert.equal(img.status, 200);
   assert.equal(img.headers.get('content-type'), 'image/png');
   assert.deepEqual(Buffer.from(await img.arrayBuffer()), png);
-
-  // ?token= works for <img> access
-  const { token } = (await (await fetch(base + '/api/login', {
+  const { token } = await (await fetch(base + '/api/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'eva', password: 'pw-eva' }),
-  })).json());
-  assert.equal((await fetch(base + `/api/sections/${sectionId}/card/backdrop?token=${token}`)).status, 200);
+  })).json();
+  assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop?token=${token}`)).status, 200);
 
   // wrong mime rejected, scanner cannot edit
-  const bad = await fetch(base + `/api/sections/${sectionId}/card/backdrop`, {
+  assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop`, {
     method: 'POST', headers: { 'Content-Type': 'text/plain', cookie: jars.admin }, body: 'x',
-  });
-  assert.equal(bad.status, 400);
-  assert.equal((await scanner('PUT', `/api/sections/${sectionId}/card`, { title: 'x' })).status, 403);
+  })).status, 400);
+  assert.equal((await scanner('PUT', `/api/events/${eventId}/card`, { title: 'x' })).status, 403);
 
   // delete
-  assert.equal((await admin('DELETE', `/api/sections/${sectionId}/card/backdrop`)).status, 200);
-  assert.equal((await admin('GET', `/api/sections/${sectionId}/card`)).data.has_backdrop, false);
-  assert.equal((await fetch(base + `/api/sections/${sectionId}/card/backdrop`, { headers: { cookie: jars.admin } })).status, 404);
+  assert.equal((await admin('DELETE', `/api/events/${eventId}/card/backdrop`)).status, 200);
+  assert.equal((await admin('GET', `/api/events/${eventId}/card`)).data.has_backdrop, false);
+  assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop`, { headers: { cookie: jars.admin } })).status, 404);
 });
 
-test('sections, UUIDs and QR codes are EVENT_ADMIN-only', async () => {
+test('sections, UUIDs and cards are EVENT_ADMIN-only', async () => {
   assert.equal((await owner('POST', `/api/events/${eventId}/sections`, { name: 'X' })).status, 403);
   assert.equal((await owner('POST', `/api/sections/${sectionId}/tickets`, { count: 1 })).status, 403);
-  assert.equal((await owner('GET', `/api/sections/${sectionId}/qrcodes.zip`)).status, 403);
+  assert.equal((await owner('GET', `/api/events/${eventId}/card`)).status, 403);
   assert.equal((await owner('GET', `/api/events/${eventId}/tickets.xlsx`)).status, 403);
   assert.equal((await owner('PATCH', `/api/events/${eventId}`, { reset_time: '05:00' })).status, 403);
 });

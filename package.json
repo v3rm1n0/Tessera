@@ -1,7 +1,7 @@
 {
   "name": "voreinlass",
   "version": "1.0.0",
-  "description": "Entry monitoring system with role-based access, QR generation and mobile scanning",
+  "description": "Entry monitoring system with role-based access, QR scanning and admission-card generation",
   "type": "module",
   "main": "server/index.js",
   "scripts": {
@@ -13,13 +13,11 @@
     "node": ">=24"
   },
   "dependencies": {
-    "archiver": "^7.0.1",
     "exceljs": "^4.4.0",
-    "express": "^4.21.2",
-    "jsqr": "^1.4.0",
-    "qrcode": "^1.5.4"
+    "express": "^4.21.2"
   },
   "devDependencies": {
+    "jsqr": "^1.4.0",
     "jszip": "^3.10.1",
     "qrcode-generator": "^2.0.4"
   }

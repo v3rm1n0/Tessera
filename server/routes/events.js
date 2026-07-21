@@ -1,8 +1,6 @@
 import express, { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import QRCode from 'qrcode';
 import ExcelJS from 'exceljs';
-import archiver from 'archiver';
 import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
 
@@ -101,11 +99,6 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
 
 // ---------------------------------------------------------------- tickets
 
-/** Display label of a ticket: "Section" or "Section – Subsection". */
-export function ticketLabel(sectionName, subsectionName) {
-  return subsectionName ? `${sectionName} – ${subsectionName}` : sectionName;
-}
-
 eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, (req, res) => {
   const count = Number(req.body?.count);
   if (!Number.isInteger(count) || count < 1 || count > 10000) {
@@ -150,36 +143,50 @@ eventsRouter.get('/sections/:sectionId/tickets', manage, requireSectionAccess, (
 
 // ----------------------------------------------------- admission cards
 //
-// The card layout is composited client-side on a <canvas> (title, body
-// text, QR and the section color) and exported as PNG. The server only
-// stores the editable config (title, body text, backdrop image) per
-// section — no native image library is needed on the server.
+// The admission card is defined ONCE per event (title, body text, backdrop
+// image); the section color is the per-card main color and the QR + label
+// ("Section – Subsection") are filled in per ticket. Cards are composited
+// client-side on a <canvas> and exported as PNG in bulk — the server stores
+// only the config and needs no native image library.
 
 const CARD_MIMES = ['image/png', 'image/jpeg', 'image/webp'];
 
-eventsRouter.get('/sections/:sectionId/card', manage, requireSectionAccess, (req, res) => {
-  const s = db.prepare(
-    'SELECT color, card_title, card_text, card_backdrop_mime FROM sections WHERE id = ?'
-  ).get(req.section.id);
+eventsRouter.get('/events/:eventId/card', manage, requireEventAccess, (req, res) => {
+  const e = db.prepare(
+    'SELECT card_title, card_text, card_backdrop_mime FROM events WHERE id = ?'
+  ).get(req.event.id);
+  const total = db.prepare(`
+    SELECT COUNT(*) AS n FROM tickets t
+    JOIN sections s ON s.id = t.section_id WHERE s.event_id = ?
+  `).get(req.event.id).n;
+  // first section/subsection drives the live preview's color and label
+  const first = db.prepare(`
+    SELECT s.name AS section, s.color, sub.name AS subsection
+    FROM sections s LEFT JOIN subsections sub ON sub.section_id = s.id
+    WHERE s.event_id = ? ORDER BY s.name, sub.name LIMIT 1
+  `).get(req.event.id);
   res.json({
-    section: req.section.name,
-    color: s.color,
-    title: s.card_title,
-    text: s.card_text,
-    has_backdrop: !!s.card_backdrop_mime,
+    event: req.event.name,
+    title: e.card_title,
+    text: e.card_text,
+    has_backdrop: !!e.card_backdrop_mime,
+    total_tickets: total,
+    sample: first
+      ? { color: first.color, label: first.subsection ? `${first.section} – ${first.subsection}` : first.section }
+      : null,
   });
 });
 
-eventsRouter.put('/sections/:sectionId/card', manage, requireSectionAccess, (req, res) => {
+eventsRouter.put('/events/:eventId/card', manage, requireEventAccess, (req, res) => {
   const title = String(req.body?.title ?? '').slice(0, 200);
   const text = String(req.body?.text ?? '').slice(0, 4000);
-  db.prepare('UPDATE sections SET card_title = ?, card_text = ? WHERE id = ?')
-    .run(title, text, req.section.id);
+  db.prepare('UPDATE events SET card_title = ?, card_text = ? WHERE id = ?')
+    .run(title, text, req.event.id);
   res.json({ ok: true });
 });
 
-eventsRouter.post('/sections/:sectionId/card/backdrop',
-  manage, requireSectionAccess,
+eventsRouter.post('/events/:eventId/card/backdrop',
+  manage, requireEventAccess,
   express.raw({ type: CARD_MIMES, limit: '8mb' }),
   (req, res) => {
     const mime = req.headers['content-type'];
@@ -189,24 +196,36 @@ eventsRouter.post('/sections/:sectionId/card/backdrop',
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       return res.status(400).json({ error: 'Bilddaten fehlen' });
     }
-    db.prepare('UPDATE sections SET card_backdrop = ?, card_backdrop_mime = ? WHERE id = ?')
-      .run(req.body, mime, req.section.id);
+    db.prepare('UPDATE events SET card_backdrop = ?, card_backdrop_mime = ? WHERE id = ?')
+      .run(req.body, mime, req.event.id);
     res.status(201).json({ ok: true });
   });
 
-eventsRouter.get('/sections/:sectionId/card/backdrop', manage, requireSectionAccess, (req, res) => {
-  const s = db.prepare('SELECT card_backdrop, card_backdrop_mime FROM sections WHERE id = ?')
-    .get(req.section.id);
-  if (!s.card_backdrop) return res.status(404).json({ error: 'Kein Hintergrundbild' });
-  res.setHeader('Content-Type', s.card_backdrop_mime);
+eventsRouter.get('/events/:eventId/card/backdrop', manage, requireEventAccess, (req, res) => {
+  const e = db.prepare('SELECT card_backdrop, card_backdrop_mime FROM events WHERE id = ?')
+    .get(req.event.id);
+  if (!e.card_backdrop) return res.status(404).json({ error: 'Kein Hintergrundbild' });
+  res.setHeader('Content-Type', e.card_backdrop_mime);
   res.setHeader('Cache-Control', 'no-store');
-  res.end(Buffer.from(s.card_backdrop));
+  res.end(Buffer.from(e.card_backdrop));
 });
 
-eventsRouter.delete('/sections/:sectionId/card/backdrop', manage, requireSectionAccess, (req, res) => {
-  db.prepare('UPDATE sections SET card_backdrop = NULL, card_backdrop_mime = NULL WHERE id = ?')
-    .run(req.section.id);
+eventsRouter.delete('/events/:eventId/card/backdrop', manage, requireEventAccess, (req, res) => {
+  db.prepare('UPDATE events SET card_backdrop = NULL, card_backdrop_mime = NULL WHERE id = ?')
+    .run(req.event.id);
   res.json({ ok: true });
+});
+
+/** Flat ticket list (with section color + label parts) for bulk card export. */
+eventsRouter.get('/events/:eventId/card/tickets', manage, requireEventAccess, (req, res) => {
+  res.json(db.prepare(`
+    SELECT t.uuid, s.name AS section, s.color, sub.name AS subsection
+    FROM tickets t
+    JOIN sections s ON s.id = t.section_id
+    LEFT JOIN subsections sub ON sub.id = t.subsection_id
+    WHERE s.event_id = ?
+    ORDER BY s.name, sub.name, t.created_at
+  `).all(req.event.id));
 });
 
 // ------------------------------------------------------------ Excel export
@@ -241,64 +260,4 @@ eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, as
     `attachment; filename="uuids-event-${req.event.id}.xlsx"`);
   await wb.xlsx.write(res);
   res.end();
-});
-
-// -------------------------------------------------------------- QR codes
-
-const escapeXml = s => s.replace(/[<>&'"]/g,
-  c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
-
-/**
- * A printable QR label: section (– subsection) on top, QR in the middle,
- * UUID below.
- */
-async function qrLabelSvg(label, uuid) {
-  const qr = await QRCode.toString(uuid, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' });
-  // embed the generated QR as a nested <svg> positioned inside the label
-  const inner = qr
-    .replace(/<\?xml[^>]*\?>\s*/, '')
-    .replace('<svg ', '<svg x="40" y="70" width="320" height="320" ');
-  const fontSize = label.length > 24 ? 17 : 24;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="470" viewBox="0 0 400 470">
-  <rect width="400" height="470" fill="#ffffff"/>
-  <text x="200" y="45" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
-        font-size="${fontSize}" font-weight="bold" fill="#000000">${escapeXml(label)}</text>
-  ${inner}
-  <text x="200" y="430" text-anchor="middle" font-family="monospace"
-        font-size="15" fill="#000000">${escapeXml(uuid)}</text>
-</svg>`;
-}
-
-eventsRouter.get('/sections/:sectionId/qrcodes.zip', manage, requireSectionAccess, async (req, res) => {
-  const tickets = sectionTickets(req.section.id);
-  const safeName = req.section.name.replace(/[^\p{L}\p{N}_-]+/gu, '_');
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="qrcodes-${safeName}.zip"`);
-  const archive = archiver('zip', { zlib: { level: 6 } });
-  archive.on('error', () => res.destroy());
-  archive.pipe(res);
-  for (const t of tickets) {
-    archive.append(await qrLabelSvg(ticketLabel(req.section.name, t.subsection), t.uuid), {
-      name: `${safeName}-${t.uuid}.svg`,
-    });
-  }
-  await archive.finalize();
-});
-
-eventsRouter.get('/sections/:sectionId/qrcodes/print', manage, requireSectionAccess, async (req, res) => {
-  const tickets = sectionTickets(req.section.id);
-  const labels = await Promise.all(tickets.map(t =>
-    qrLabelSvg(ticketLabel(req.section.name, t.subsection), t.uuid)));
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!doctype html><html lang="de"><head><meta charset="utf-8">
-<title>QR-Codes – ${escapeXml(req.section.name)}</title>
-<style>
-  body { margin: 1cm; font-family: sans-serif; }
-  .grid { display: flex; flex-wrap: wrap; gap: 8mm; }
-  .grid svg { width: 62mm; height: auto; border: 0.3mm solid #ccc; page-break-inside: avoid; }
-  @media print { .noprint { display: none; } }
-</style></head><body>
-<p class="noprint"><button onclick="print()">Drucken</button> ${tickets.length} QR-Codes</p>
-<div class="grid">${labels.join('\n')}</div>
-</body></html>`);
 });

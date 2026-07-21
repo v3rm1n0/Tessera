@@ -248,12 +248,6 @@ async function eventBlock(reload) {
         el('div', { class: 'title' }, s.name),
         el('div', { class: 'muted', style: 'font-size:12.5px' }, `${s.ticket_count} Codes`)),
       count, subSelect, genBtn,
-      el('a', { class: 'btn secondary sm', href: tokenized(`/api/sections/${s.id}/qrcodes.zip`) }, 'QR · ZIP'),
-      el('a', { class: 'btn secondary sm', href: tokenized(`/api/sections/${s.id}/qrcodes/print`), target: '_blank' }, 'QR · Drucken'),
-      el('button', {
-        class: 'btn secondary sm',
-        onclick: () => { location.hash = `#/karte/${s.id}`; },
-      }, '🎟 Einlasskarte'),
       el('button', {
         class: 'btn danger sm',
         onclick: async () => {
@@ -270,6 +264,15 @@ async function eventBlock(reload) {
       el('div', { class: 'label', style: 'margin-bottom:8px' },
         'Täglicher Reset der Scan-Zähler'),
       resetForm),
+    el('div', { class: 'card', style: 'margin-bottom:14px' },
+      el('div', { class: 'label', style: 'margin-bottom:8px' }, 'Einlasskarte'),
+      el('div', { class: 'inline-form', style: 'flex-wrap:wrap' },
+        el('button', {
+          class: 'btn',
+          onclick: () => { location.hash = `#/karte/${event.id}`; },
+        }, '🎟 Einlasskarte gestalten & exportieren'),
+        el('span', { class: 'muted', style: 'font-size:12.5px' },
+          'Einmal definieren, alle Karten als PNG exportieren.'))),
     el('div', { class: 'card' },
       el('div', { class: 'label', style: 'margin-bottom:8px' }, 'Abteilungen'),
       secForm,

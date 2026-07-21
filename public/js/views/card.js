@@ -6,22 +6,22 @@ import { CARD_W, CARD_H, drawCard, qrMatrix } from '../card-render.js';
 const PLACEHOLDER_UUID = '00000000-0000-4000-8000-000000000000';
 const safe = s => s.replace(/[^\p{L}\p{N}_-]+/gu, '_');
 
-/** Einlasskarten editor: live preview + bulk PNG export (EVENT_ADMIN only). */
-export async function renderCardEditor(content, sectionId) {
-  let cfg, tickets;
+/**
+ * Einlasskarten editor (EVENT_ADMIN). The card is defined once per event;
+ * every ticket of every section is exported at once as PNGs in a ZIP,
+ * each using its section color and "Section – Subsection" label.
+ */
+export async function renderCardEditor(content, eventId) {
+  let cfg;
   try {
-    [cfg, tickets] = await Promise.all([
-      api.get(`/api/sections/${sectionId}/card`),
-      api.get(`/api/sections/${sectionId}/tickets`),
-    ]);
+    cfg = await api.get(`/api/events/${eventId}/card`);
   } catch (err) {
     content.replaceChildren(el('div', { class: 'error-text' }, err.message));
     return;
   }
 
+  const sample = cfg.sample || { color: '#4f9cf5', label: 'Abteilung' };
   let backdropImg = null;
-
-  const labelFor = t => (t?.subsection ? `${cfg.section} – ${t.subsection}` : cfg.section);
 
   // ---- controls
   const titleInput = el('input', {
@@ -29,7 +29,7 @@ export async function renderCardEditor(content, sectionId) {
     value: cfg.title || 'VOREINLASS-AUSWEIS',
   });
   const textInput = el('textarea', {
-    rows: '10', maxlength: '4000',
+    rows: '11', maxlength: '4000',
     placeholder: 'Text der Einlasskarte …',
   });
   textInput.value = cfg.text || '';
@@ -40,17 +40,15 @@ export async function renderCardEditor(content, sectionId) {
   const ctx = canvas.getContext('2d');
 
   function preview() {
-    const sample = tickets[0];
     drawCard(ctx, {
-      color: cfg.color,
+      color: sample.color,
       title: titleInput.value,
       text: textInput.value,
-      label: labelFor(sample),
+      label: sample.label,
       backdropImg,
-      matrix: qrMatrix(sample ? sample.uuid : PLACEHOLDER_UUID),
+      matrix: qrMatrix(PLACEHOLDER_UUID),
     });
   }
-
   titleInput.addEventListener('input', preview);
   textInput.addEventListener('input', preview);
 
@@ -59,9 +57,7 @@ export async function renderCardEditor(content, sectionId) {
   saveBtn.addEventListener('click', async () => {
     saveBtn.disabled = true;
     try {
-      await api.put(`/api/sections/${sectionId}/card`, {
-        title: titleInput.value, text: textInput.value,
-      });
+      await api.put(`/api/events/${eventId}/card`, { title: titleInput.value, text: textInput.value });
       cfg.title = titleInput.value;
       cfg.text = textInput.value;
       saveBtn.textContent = 'Gespeichert ✓';
@@ -75,26 +71,26 @@ export async function renderCardEditor(content, sectionId) {
     const img = new Image();
     img.onload = () => { backdropImg = img; preview(); };
     img.onerror = () => { backdropImg = null; preview(); };
-    img.src = `/api/sections/${sectionId}/card/backdrop`
+    img.src = `/api/events/${eventId}/card/backdrop`
       + `?token=${encodeURIComponent(activeToken() || '')}&t=${Date.now()}`;
   }
 
   const fileInput = el('input', {
-    type: 'file', accept: 'image/png,image/jpeg,image/webp',
-    style: 'display:none',
+    type: 'file', accept: 'image/png,image/jpeg,image/webp', style: 'display:none',
   });
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0];
     if (!file) return;
     if (file.size > 8 * 1024 * 1024) { alert('Bild ist zu groß (max. 8 MB).'); fileInput.value = ''; return; }
     try {
-      const res = await fetch(`/api/sections/${sectionId}/card/backdrop`, {
+      const res = await fetch(`/api/events/${eventId}/card/backdrop`, {
         method: 'POST',
         headers: { 'Content-Type': file.type, Authorization: `Bearer ${activeToken()}` },
         body: await file.arrayBuffer(),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Upload fehlgeschlagen');
       cfg.has_backdrop = true;
+      removeBtn.style.display = '';
       loadBackdrop();
     } catch (err) { alert(err.message); }
     fileInput.value = '';
@@ -102,28 +98,19 @@ export async function renderCardEditor(content, sectionId) {
 
   const uploadBtn = el('button', { class: 'btn secondary' }, '🖼 Hintergrundbild wählen');
   uploadBtn.addEventListener('click', () => fileInput.click());
-  const removeBtn = el('button', { class: 'btn secondary sm' }, 'Bild entfernen');
+  const removeBtn = el('button', {
+    class: 'btn secondary sm',
+    style: cfg.has_backdrop ? '' : 'display:none',
+  }, 'Bild entfernen');
   removeBtn.addEventListener('click', async () => {
     try {
-      await api.del(`/api/sections/${sectionId}/card/backdrop`);
-      cfg.has_backdrop = false; backdropImg = null; preview();
+      await api.del(`/api/events/${eventId}/card/backdrop`);
+      cfg.has_backdrop = false; backdropImg = null; removeBtn.style.display = 'none'; preview();
     } catch (err) { alert(err.message); }
   });
 
   // ---- export
   const progress = el('span', { class: 'muted', style: 'font-size:13px' });
-
-  async function renderTicketBlob(octx, offCanvas, t) {
-    drawCard(octx, {
-      color: cfg.color,
-      title: titleInput.value,
-      text: textInput.value,
-      label: labelFor(t),
-      backdropImg,
-      matrix: qrMatrix(t.uuid),
-    });
-    return new Promise(resolve => offCanvas.toBlob(resolve, 'image/png'));
-  }
 
   function download(blob, name) {
     const url = URL.createObjectURL(blob);
@@ -135,34 +122,45 @@ export async function renderCardEditor(content, sectionId) {
   }
 
   const singleBtn = el('button', { class: 'btn secondary' }, 'Vorschau als PNG');
-  singleBtn.addEventListener('click', async () => {
+  singleBtn.addEventListener('click', () => {
     const off = document.createElement('canvas');
     off.width = CARD_W; off.height = CARD_H;
-    const blob = await renderTicketBlob(off.getContext('2d'), off, tickets[0] || null);
-    download(blob, `Einlasskarte-${safe(cfg.section)}-vorschau.png`);
+    drawCard(off.getContext('2d'), {
+      color: sample.color, title: titleInput.value, text: textInput.value,
+      label: sample.label, backdropImg, matrix: qrMatrix(PLACEHOLDER_UUID),
+    });
+    off.toBlob(blob => download(blob, `Einlasskarte-${safe(cfg.event)}-vorschau.png`), 'image/png');
   });
 
   const bulkBtn = el('button', { class: 'btn' },
-    tickets.length ? `Alle ${tickets.length} als PNG (ZIP)` : 'Keine UUIDs vorhanden');
-  bulkBtn.disabled = tickets.length === 0;
+    cfg.total_tickets ? `Alle ${cfg.total_tickets} Karten als PNG (ZIP)` : 'Keine UUIDs vorhanden');
+  bulkBtn.disabled = cfg.total_tickets === 0;
   bulkBtn.addEventListener('click', async () => {
     bulkBtn.disabled = true;
-    const zip = new window.JSZip();
-    const off = document.createElement('canvas');
-    off.width = CARD_W; off.height = CARD_H;
-    const octx = off.getContext('2d');
+    progress.textContent = 'Lade UUIDs …';
     try {
+      const tickets = await api.get(`/api/events/${eventId}/card/tickets`);
+      if (tickets.length === 0) { progress.textContent = 'Keine UUIDs vorhanden.'; return; }
+      const zip = new window.JSZip();
+      const off = document.createElement('canvas');
+      off.width = CARD_W; off.height = CARD_H;
+      const octx = off.getContext('2d');
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
-        const blob = await renderTicketBlob(octx, off, t);
-        zip.file(`${safe(labelFor(t))}-${t.uuid}.png`, blob);
+        const label = t.subsection ? `${t.section} – ${t.subsection}` : t.section;
+        drawCard(octx, {
+          color: t.color, title: titleInput.value, text: textInput.value,
+          label, backdropImg, matrix: qrMatrix(t.uuid),
+        });
+        const blob = await new Promise(r => off.toBlob(r, 'image/png'));
+        zip.folder(safe(label)).file(`${t.uuid}.png`, blob);
         progress.textContent = `Erzeuge ${i + 1}/${tickets.length} …`;
-        if (i % 8 === 0) await new Promise(r => setTimeout(r)); // keep UI responsive
+        if (i % 8 === 0) await new Promise(r => setTimeout(r));
       }
       progress.textContent = 'Packe ZIP …';
       const out = await zip.generateAsync({ type: 'blob' });
-      download(out, `Einlasskarten-${safe(cfg.section)}.zip`);
-      progress.textContent = `${tickets.length} PNG erzeugt.`;
+      download(out, `Einlasskarten-${safe(cfg.event)}.zip`);
+      progress.textContent = `${tickets.length} Karten erzeugt.`;
     } catch (err) {
       progress.textContent = '';
       alert(err.message);
@@ -173,21 +171,17 @@ export async function renderCardEditor(content, sectionId) {
   // ---- layout
   content.replaceChildren(
     el('button', { class: 'btn secondary sm', onclick: () => history.back() }, '← Zurück'),
-    el('div', { class: 'section-head' },
-      el('span', { class: 'color-dot', style: `background:${cfg.color};width:16px;height:16px` }),
-      el('h2', {}, `Einlasskarte – ${cfg.section}`)),
+    el('div', { class: 'section-head' }, el('h2', {}, `Einlasskarte – ${cfg.event}`)),
     el('div', { class: 'card-editor' },
       el('div', { class: 'card-controls' },
         el('label', { class: 'field' }, el('span', {}, 'Titel'), titleInput),
         el('label', { class: 'field' }, el('span', {}, 'Text'), textInput),
         el('div', { class: 'field' },
           el('span', {}, 'Hintergrundbild'),
-          el('div', { class: 'inline-form', style: 'flex-wrap:wrap' },
-            fileInput, uploadBtn,
-            cfg.has_backdrop ? removeBtn : null)),
+          el('div', { class: 'inline-form', style: 'flex-wrap:wrap' }, fileInput, uploadBtn, removeBtn)),
         el('p', { class: 'muted', style: 'font-size:12.5px' },
-          'Die Hauptfarbe stammt aus der Abteilung. QR-Code und Beschriftung '
-          + '(Abteilung – Unterabteilung) werden pro UUID automatisch eingesetzt.'),
+          'Einmal definiert – gilt für alle Abteilungen. Hauptfarbe, QR-Code und '
+          + 'Beschriftung (Abteilung – Unterabteilung) werden pro UUID automatisch eingesetzt.'),
         el('div', { class: 'inline-form', style: 'flex-wrap:wrap;margin-top:6px' },
           saveBtn, singleBtn, bulkBtn),
         el('div', { style: 'margin-top:8px' }, progress)),

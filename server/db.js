@@ -79,10 +79,20 @@ db.exec(`
 
 // -------------------------------------------------------------- migrations
 
+function tableColumns(table) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+}
+
 function addColumnIfMissing(table, column, definition) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
-  if (!cols.includes(column)) {
+  if (!tableColumns(table).includes(column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+function dropColumnIfExists(table, column) {
+  if (tableColumns(table).includes(column)) {
+    try { db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`); }
+    catch { /* SQLite without DROP COLUMN: leave the unused column in place */ }
   }
 }
 
@@ -99,11 +109,15 @@ db.exec(`
 addColumnIfMissing('tickets', 'subsection_id',
   'INTEGER REFERENCES subsections(id) ON DELETE SET NULL');
 
-// admission card (Einlasskarte) configuration per section
-addColumnIfMissing('sections', 'card_title', "TEXT NOT NULL DEFAULT ''");
-addColumnIfMissing('sections', 'card_text', "TEXT NOT NULL DEFAULT ''");
-addColumnIfMissing('sections', 'card_backdrop', 'BLOB');
-addColumnIfMissing('sections', 'card_backdrop_mime', 'TEXT');
+// admission card (Einlasskarte) configuration — defined once per event
+addColumnIfMissing('events', 'card_title', "TEXT NOT NULL DEFAULT ''");
+addColumnIfMissing('events', 'card_text', "TEXT NOT NULL DEFAULT ''");
+addColumnIfMissing('events', 'card_backdrop', 'BLOB');
+addColumnIfMissing('events', 'card_backdrop_mime', 'TEXT');
+// superseded per-section card columns (from an earlier version)
+for (const col of ['card_title', 'card_text', 'card_backdrop', 'card_backdrop_mime']) {
+  dropColumnIfExists('sections', col);
+}
 
 // ------------------------------------------------------------------ colors
 
