@@ -139,5 +139,18 @@ Bestehende Owner-Sessions werden dabei abgemeldet.
 ## Tests
 
 ```sh
-node --test test/api.test.mjs
+npm test
 ```
+
+## Releases
+
+Ein Tag-Push erstellt automatisch ein Release auf Codeberg
+(`.forgejo/workflows/release.yml`, Forgejo Actions):
+
+```sh
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+Einmalige Einrichtung: Actions im Repo aktivieren und ein Token mit Scope
+`write:repository` als Secret `RELEASE_TOKEN` hinterlegen (Details im
+Workflow-Header).

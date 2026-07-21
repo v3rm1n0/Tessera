@@ -1,0 +1,45 @@
+# Codeberg (Forgejo) Actions — publish a release whenever a tag is pushed.
+#
+# Auth (Forgejo has no GitHub-style `permissions:` field — it is ignored):
+#   Reliable path → create an application token (user Settings → Applications,
+#   scope `write:repository`) and add it as the repo Actions secret
+#   `RELEASE_TOKEN` (Settings → Actions → Secrets).
+#   Alternatively, authorize the built-in `${{ github.token }}` to create
+#   releases via repo Settings → Actions → Authorized Integrations; it is used
+#   automatically when no RELEASE_TOKEN secret is set.
+#
+# Publish a release:
+#   git tag v1.1.0 && git push origin v1.1.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    # Codeberg shared runners (pick by size): codeberg-tiny | codeberg-small |
+    # codeberg-medium. The non-lazy label runs steps in a Node image, which the
+    # JS actions below need.
+    runs-on: codeberg-tiny
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # an empty dir ⇒ the release is created without extra upload assets
+      # (Codeberg always attaches the source archives automatically)
+      - name: Prepare assets
+        run: mkdir -p release
+
+      - name: Create release for ${{ github.ref_name }}
+        uses: https://code.forgejo.org/actions/forgejo-release@v2
+        with:
+          direction: upload
+          url: ${{ github.server_url }}
+          repo: ${{ github.repository }}
+          tag: ${{ github.ref_name }}
+          release-dir: release
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          override: true
