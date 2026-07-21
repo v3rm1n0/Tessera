@@ -23,12 +23,30 @@ nativen Module nötig).
 
 | Rolle | Rechte |
 |---|---|
-| **Owner** | Events anlegen, Event-Admin-/Scanner-Konten erstellen und Events zuweisen |
-| **Event-Admin** | Ausschließlich zuständig für die zugewiesenen Events: Abteilungen anlegen, UUIDs generieren, QR-Codes (ZIP/Druckansicht), Excel-Export, tägliche Reset-Zeit festlegen |
+| **Owner** | Nur Verwaltung: Events anlegen, Event-Admin-/Scanner-Konten erstellen und Events zuweisen. **Kein** Scannen und **kein** Dashboard. |
+| **Event-Admin** | Zuständig für die zugewiesenen Events: Abteilungen (mit Farbe) und Unterabteilungen anlegen, UUIDs generieren, QR-Codes (ZIP/Druckansicht), Einlasskarten gestalten, Excel-Export, tägliche Reset-Zeit festlegen. Sieht auch Dashboard/Scanner. |
 | **Scanner** | Scannen + Dashboard der zugewiesenen Events |
 
-Abteilungen, UUIDs und QR-Codes verwaltet **nur** der Event-Admin — auch der
-Owner hat auf diese Endpunkte keinen Zugriff.
+Abteilungen, UUIDs, QR-Codes und Einlasskarten verwaltet **nur** der
+Event-Admin — der Owner hat auf diese Endpunkte keinen Zugriff und landet nach
+dem Login direkt in der Verwaltung. Der Owner legt Konten direkt im jeweiligen
+Event an (Event-Kachel → „+ Konto") oder weist bestehende Konten zu.
+
+**Abteilungsfarben:** Jede Abteilung erhält beim Anlegen automatisch eine
+Farbe aus einer Palette (oder eine selbst gewählte). Sie erscheint im Dashboard
+und ist die Hauptfarbe der Einlasskarte.
+
+**Unterabteilungen:** Abteilungen können optional Unterabteilungen haben
+(z. B. Ordnungsdienst → Eingangsordner / Innenraum Ordner). UUIDs werden
+wahlweise für eine Unterabteilung erzeugt; QR-Label und Scan-Feedback zeigen
+dann „Abteilung – Unterabteilung".
+
+**Einlasskarten:** Pro Abteilung lässt sich eine druckbare Einlasskarte
+gestalten — Hintergrundbild, Titel und Text sind frei wählbar, die Hauptfarbe
+kommt aus der Abteilung. Die Karten werden im Browser auf einem `<canvas>`
+zusammengesetzt (QR-Code + „Abteilung – Unterabteilung" pro UUID) und in großer
+Stückzahl als PNG in einer ZIP-Datei exportiert. Der Server speichert nur die
+Konfiguration (kein natives Bildmodul nötig).
 
 **Kontowechsler:** Über den Bereich unten in der Seitenleiste können mehrere
 Konten gleichzeitig angemeldet sein („Konto hinzufügen") und per Klick
@@ -37,9 +55,11 @@ gewechselt werden. Jedes Konto behält seine eigene Session (Bearer-Token).
 ## Ablauf
 
 1. Als Owner anmelden → **Verwaltung**: Event anlegen, Konten anlegen, zuweisen.
-2. Als Event-Admin: Abteilungen anlegen, pro Abteilung UUIDs
-   erzeugen, QR-Codes drucken (jedes Label zeigt Abteilungsname + UUID),
-   UUIDs als Excel exportieren, Reset-Zeit einstellen (Standard 00:00).
+2. Als Event-Admin: Abteilungen (mit Farbe) und optional Unterabteilungen
+   anlegen, pro Abteilung/Unterabteilung UUIDs erzeugen, QR-Codes drucken
+   (jedes Label zeigt „Abteilung – Unterabteilung" + UUID), Einlasskarten
+   gestalten und als PNG-ZIP exportieren, UUIDs als Excel exportieren,
+   Reset-Zeit einstellen (Standard 00:00).
 3. Scanner öffnen **Scannen** am Handy: Kamera scannt, Feedback:
    - **OK** (grün) mit laufender Scan-Nummer der Abteilung
    - **Doppelt** (orange) mit der UUID des bereits gescannten Codes
@@ -59,17 +79,25 @@ der Server wiederholt innerhalb von 5 s dieselbe OK-Antwort statt ein
 
 ```
 POST   /api/login | /api/logout      GET /api/me
-POST   /api/admin/users              GET/DELETE ebenso        (Owner)
+POST   /api/admin/users              GET/DELETE ebenso            (Owner)
 POST   /api/admin/events             POST /api/admin/events/:id/assignments
-PATCH  /api/events/:id               { reset_time: "HH:MM" }  (Event-Admin)
-POST   /api/events/:id/sections
-POST   /api/sections/:id/tickets     { count: n }
-GET    /api/sections/:id/tickets
-GET    /api/events/:id/tickets.xlsx
+POST   /api/admin/events/:id/users   Konto anlegen + zuweisen     (Owner)
+PATCH  /api/events/:id               { reset_time: "HH:MM" }      (Event-Admin)
+POST   /api/events/:id/sections      { name, color? }
+PATCH  /api/sections/:id             { color }
+POST   /api/sections/:id/subsections { name }
+GET/DELETE Unterabteilungen ebenso
+POST   /api/sections/:id/tickets     { count: n, subsection_id? }
+GET    /api/sections/:id/tickets     GET /api/events/:id/tickets.xlsx
 GET    /api/sections/:id/qrcodes.zip | /api/sections/:id/qrcodes/print
-GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles
-POST   /api/scan                     { code: "<uuid>" }
+GET    /api/sections/:id/card        PUT { title, text }
+POST/GET/DELETE /api/sections/:id/card/backdrop   (Bild-Upload, raw)
+GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles  (Event-Rollen)
+POST   /api/scan                     { code: "<uuid>" }             (Event-Rollen)
 ```
+
+Download-/Bild-Links tragen den Session-Token als `?token=` (da `<a>`/`<img>`
+keine Header senden); alle anderen Aufrufe nutzen das Bearer-Token bzw. Cookie.
 
 ## Owner-Passwort vergessen?
 
