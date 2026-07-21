@@ -24,29 +24,32 @@ nativen Module nötig).
 | Rolle | Rechte |
 |---|---|
 | **Owner** | Nur Verwaltung: Events anlegen, Event-Admin-/Scanner-Konten erstellen und Events zuweisen. **Kein** Scannen und **kein** Dashboard. |
-| **Event-Admin** | Zuständig für die zugewiesenen Events: Abteilungen (mit Farbe) und Unterabteilungen anlegen, UUIDs generieren, QR-Codes (ZIP/Druckansicht), Einlasskarten gestalten, Excel-Export, tägliche Reset-Zeit festlegen. Sieht auch Dashboard/Scanner. |
+| **Event-Admin** | Zuständig für die zugewiesenen Events: Abteilungen (mit Farbe) und Unterabteilungen anlegen, UUIDs generieren, Einlasskarten gestalten und exportieren, Excel-Export, tägliche Reset-Zeit festlegen. Sieht auch Dashboard/Scanner. |
 | **Scanner** | Scannen + Dashboard der zugewiesenen Events |
 
-Abteilungen, UUIDs, QR-Codes und Einlasskarten verwaltet **nur** der
-Event-Admin — der Owner hat auf diese Endpunkte keinen Zugriff und landet nach
-dem Login direkt in der Verwaltung. Der Owner legt Konten direkt im jeweiligen
-Event an (Event-Kachel → „+ Konto") oder weist bestehende Konten zu.
+Abteilungen, UUIDs und Einlasskarten verwaltet **nur** der Event-Admin — der
+Owner hat auf diese Endpunkte keinen Zugriff und landet nach dem Login direkt
+in der Verwaltung. Der Owner legt Konten direkt im jeweiligen Event an
+(Event-Kachel → „+ Konto") oder weist bestehende Konten zu.
 
 **Abteilungsfarben:** Jede Abteilung erhält beim Anlegen automatisch eine
 Farbe aus einer Palette (oder eine selbst gewählte). Sie erscheint im Dashboard
 und ist die Hauptfarbe der Einlasskarte.
 
 **Unterabteilungen:** Abteilungen können optional Unterabteilungen haben
-(z. B. Ordnungsdienst → Eingangsordner / Innenraum Ordner). UUIDs werden
-wahlweise für eine Unterabteilung erzeugt; QR-Label und Scan-Feedback zeigen
-dann „Abteilung – Unterabteilung".
+(z. B. Ordnungsdienst → Eingangsordner / Innenraum Ordner). In der Verwaltung
+erscheint jede Abteilung als Karte, die ihre Unterabteilungen als eingebettete
+Karten enthält — jede Ebene mit eigenem Code-Zähler und UUID-Generator. UUIDs
+werden pro Ebene erzeugt; Karten-Label und Scan-Feedback zeigen dann
+„Abteilung – Unterabteilung".
 
-**Einlasskarten:** Pro Abteilung lässt sich eine druckbare Einlasskarte
-gestalten — Hintergrundbild, Titel und Text sind frei wählbar, die Hauptfarbe
-kommt aus der Abteilung. Die Karten werden im Browser auf einem `<canvas>`
-zusammengesetzt (QR-Code + „Abteilung – Unterabteilung" pro UUID) und in großer
-Stückzahl als PNG in einer ZIP-Datei exportiert. Der Server speichert nur die
-Konfiguration (kein natives Bildmodul nötig).
+**Einlasskarten:** Die Einlasskarte wird **einmal pro Event** gestaltet —
+Hintergrundbild, Titel und Text (mit `**Fettdruck**`) sind frei wählbar. Ein
+einziger Export erzeugt für **jede UUID aller Abteilungen** eine Karte: im
+Browser auf einem `<canvas>` zusammengesetzt (Hauptfarbe der jeweiligen
+Abteilung, QR-Code + „Abteilung – Unterabteilung"), gebündelt als PNG in einer
+ZIP-Datei. Der Server speichert nur die Konfiguration (kein natives Bildmodul,
+keine serverseitige QR-Bibliothek nötig).
 
 **Kontowechsler:** Über den Bereich unten in der Seitenleiste können mehrere
 Konten gleichzeitig angemeldet sein („Konto hinzufügen") und per Klick
@@ -56,9 +59,8 @@ gewechselt werden. Jedes Konto behält seine eigene Session (Bearer-Token).
 
 1. Als Owner anmelden → **Verwaltung**: Event anlegen, Konten anlegen, zuweisen.
 2. Als Event-Admin: Abteilungen (mit Farbe) und optional Unterabteilungen
-   anlegen, pro Abteilung/Unterabteilung UUIDs erzeugen, QR-Codes drucken
-   (jedes Label zeigt „Abteilung – Unterabteilung" + UUID), Einlasskarten
-   gestalten und als PNG-ZIP exportieren, UUIDs als Excel exportieren,
+   anlegen, pro Ebene UUIDs erzeugen, die Einlasskarte einmal gestalten und
+   alle Karten als PNG-ZIP exportieren, UUIDs als Excel exportieren,
    Reset-Zeit einstellen (Standard 00:00).
 3. Scanner öffnen **Scannen** am Handy: Kamera scannt, Feedback:
    - **OK** (grün) mit laufender Scan-Nummer der Abteilung
@@ -89,9 +91,9 @@ POST   /api/sections/:id/subsections { name }
 GET/DELETE Unterabteilungen ebenso
 POST   /api/sections/:id/tickets     { count: n, subsection_id? }
 GET    /api/sections/:id/tickets     GET /api/events/:id/tickets.xlsx
-GET    /api/sections/:id/qrcodes.zip | /api/sections/:id/qrcodes/print
-GET    /api/sections/:id/card        PUT { title, text }
-POST/GET/DELETE /api/sections/:id/card/backdrop   (Bild-Upload, raw)
+GET    /api/events/:id/card          PUT { title, text }        (einmal pro Event)
+POST/GET/DELETE /api/events/:id/card/backdrop   (Bild-Upload, raw)
+GET    /api/events/:id/card/tickets  Flache Liste für PNG-Export
 GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles  (Event-Rollen)
 POST   /api/scan                     { code: "<uuid>" }             (Event-Rollen)
 ```
