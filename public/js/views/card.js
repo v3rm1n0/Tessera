@@ -146,6 +146,13 @@ export async function renderCardEditor(content, eventId) {
     off.toBlob(blob => download(blob, `Einlasskarte-${safe(cfg.event)}-vorschau.png`), 'image/png');
   });
 
+  // optional: drop a UUID-list Excel into each section/subsection folder
+  const xlsxCheckbox = el('input', { type: 'checkbox', id: 'incl-xlsx', style: 'width:auto;margin:0' });
+  const xlsxLabel = el('label', {
+    for: 'incl-xlsx',
+    style: 'display:flex;align-items:center;gap:8px;margin:0;color:var(--text);cursor:pointer;font-size:13.5px',
+  }, xlsxCheckbox, 'Excel-Liste (UUIDs zum Abhaken) je Ordner beilegen');
+
   const bulkBtn = el('button', { class: 'btn' },
     cfg.total_tickets ? `Alle ${cfg.total_tickets} Karten als PNG (ZIP)` : 'Keine UUIDs vorhanden');
   bulkBtn.disabled = cfg.total_tickets === 0;
@@ -174,6 +181,17 @@ export async function renderCardEditor(content, eventId) {
         dir.file(`${t.uuid}.png`, blob);
         progress.textContent = `Erzeuge ${i + 1}/${tickets.length} …`;
         if (i % 8 === 0) await new Promise(r => setTimeout(r));
+      }
+      if (xlsxCheckbox.checked) {
+        progress.textContent = 'Erzeuge Excel-Listen …';
+        const { groups } = await api.get(`/api/events/${eventId}/card/xlsx`);
+        for (const g of groups) {
+          const bytes = Uint8Array.from(atob(g.base64), c => c.charCodeAt(0));
+          const dir = g.subsection
+            ? zip.folder(safe(g.section)).folder(safe(g.subsection))
+            : zip.folder(safe(g.section));
+          dir.file('UUIDs.xlsx', bytes);
+        }
       }
       progress.textContent = 'Packe ZIP …';
       const out = await zip.generateAsync({ type: 'blob' });
@@ -205,6 +223,7 @@ export async function renderCardEditor(content, eventId) {
         el('p', { class: 'muted', style: 'font-size:12.5px' },
           'Einmal definiert – gilt für alle Abteilungen. Hauptfarbe, QR-Code und '
           + 'Beschriftung (Abteilung – Unterabteilung) werden pro UUID automatisch eingesetzt.'),
+        el('div', { style: 'margin:8px 0' }, xlsxLabel),
         el('div', { class: 'inline-form', style: 'flex-wrap:wrap;margin-top:6px' },
           saveBtn, singleBtn, bulkBtn),
         el('div', { style: 'margin-top:8px' }, progress)),

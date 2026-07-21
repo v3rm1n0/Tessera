@@ -228,6 +228,51 @@ eventsRouter.get('/events/:eventId/card/tickets', manage, requireEventAccess, (r
   `).all(req.event.id));
 });
 
+/**
+ * One small UUID-list workbook per folder of the card export: grouped by
+ * subsection, plus a group per section for its direct (no-subsection)
+ * tickets. Columns are just the label, the UUID and an empty recipient
+ * column so section/subsection heads can tick off who received which code.
+ * Returned as base64 so the client can drop each into the matching folder.
+ */
+eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async (req, res) => {
+  const rows = db.prepare(`
+    SELECT t.uuid, s.id AS section_id, s.name AS section,
+           t.subsection_id, sub.name AS subsection
+    FROM tickets t
+    JOIN sections s ON s.id = t.section_id
+    LEFT JOIN subsections sub ON sub.id = t.subsection_id
+    WHERE s.event_id = ?
+    ORDER BY s.name, sub.name, t.created_at
+  `).all(req.event.id);
+
+  const groups = new Map();
+  for (const r of rows) {
+    const key = `${r.section_id}|${r.subsection_id ?? ''}`;
+    if (!groups.has(key)) {
+      groups.set(key, { section: r.section, subsection: r.subsection, uuids: [] });
+    }
+    groups.get(key).uuids.push(r.uuid);
+  }
+
+  const out = [];
+  for (const g of groups.values()) {
+    const label = g.subsection ? `${g.section} – ${g.subsection}` : g.section;
+    const wb = new ExcelJS.Workbook();
+    const sheet = wb.addWorksheet('UUIDs');
+    sheet.columns = [
+      { header: 'Abteilung', key: 'label', width: 34 },
+      { header: 'UUID', key: 'uuid', width: 40 },
+      { header: 'Name (Empfänger)', key: 'name', width: 30 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    for (const uuid of g.uuids) sheet.addRow({ label, uuid, name: '' });
+    const buf = await wb.xlsx.writeBuffer();
+    out.push({ section: g.section, subsection: g.subsection, base64: Buffer.from(buf).toString('base64') });
+  }
+  res.json({ groups: out });
+});
+
 // ------------------------------------------------------------ Excel export
 
 eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, async (req, res) => {

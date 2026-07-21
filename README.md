@@ -67,6 +67,11 @@ ZIP-Datei — je Abteilung ein Ordner, je Unterabteilung ein Unterordner
 (`Abteilung/Unterabteilung/uuid.png`). Der Server speichert nur die
 Konfiguration (kein natives Bildmodul, keine serverseitige QR-Bibliothek nötig).
 
+Optional (Häkchen im Export) liegt jedem Ordner eine `UUIDs.xlsx` bei, die nur
+die zugehörige Abteilung/Unterabteilung, die UUIDs und eine leere Spalte
+„Name (Empfänger)" enthält — so können Abteilungs- und Unterabteilungsleiter
+abhaken, wer welche UUID erhalten hat.
+
 **Kontowechsler:** Über den Bereich unten in der Seitenleiste können mehrere
 Konten gleichzeitig angemeldet sein („Konto hinzufügen") und per Klick
 gewechselt werden. Jedes Konto behält seine eigene Session (Bearer-Token).

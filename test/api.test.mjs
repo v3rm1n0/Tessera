@@ -283,6 +283,27 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
   assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop`, { headers: { cookie: jars.admin } })).status, 404);
 });
 
+test('per-folder UUID excel groups by section and subsection', async () => {
+  const sec = (await admin('POST', `/api/events/${eventId}/sections`, { name: 'Excel-Test' })).data;
+  const sub = (await admin('POST', `/api/sections/${sec.id}/subsections`, { name: 'Team A' })).data;
+  await admin('POST', `/api/sections/${sec.id}/tickets`, { count: 2 });                        // direct
+  await admin('POST', `/api/sections/${sec.id}/tickets`, { count: 3, subsection_id: sub.id }); // subsection
+
+  const res = await admin('GET', `/api/events/${eventId}/card/xlsx`);
+  assert.equal(res.status, 200);
+  const direct = res.data.groups.find(g => g.section === 'Excel-Test' && !g.subsection);
+  const subGrp = res.data.groups.find(g => g.section === 'Excel-Test' && g.subsection === 'Team A');
+  assert.ok(direct && subGrp, 'a section-direct group and a subsection group');
+  for (const g of [direct, subGrp]) {
+    const buf = Buffer.from(g.base64, 'base64');
+    assert.equal(buf[0], 0x50); // 'P'
+    assert.equal(buf[1], 0x4b); // 'K' → xlsx is a zip container
+  }
+  assert.equal((await owner('GET', `/api/events/${eventId}/card/xlsx`)).status, 403);
+
+  await admin('DELETE', `/api/sections/${sec.id}`); // cleanup, cascades tickets + subsection
+});
+
 test('sections, UUIDs and cards are EVENT_ADMIN-only', async () => {
   assert.equal((await owner('POST', `/api/events/${eventId}/sections`, { name: 'X' })).status, 403);
   assert.equal((await owner('POST', `/api/sections/${sectionId}/tickets`, { count: 1 })).status, 403);
