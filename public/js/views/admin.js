@@ -251,6 +251,10 @@ async function eventBlock(reload) {
       el('a', { class: 'btn secondary sm', href: tokenized(`/api/sections/${s.id}/qrcodes.zip`) }, 'QR · ZIP'),
       el('a', { class: 'btn secondary sm', href: tokenized(`/api/sections/${s.id}/qrcodes/print`), target: '_blank' }, 'QR · Drucken'),
       el('button', {
+        class: 'btn secondary sm',
+        onclick: () => { location.hash = `#/karte/${s.id}`; },
+      }, '🎟 Einlasskarte'),
+      el('button', {
         class: 'btn danger sm',
         onclick: async () => {
           if (!confirm(`Abteilung „${s.name}" mit allen Codes löschen?`)) return;

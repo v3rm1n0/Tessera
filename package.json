@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=24"
@@ -18,5 +18,9 @@
     "express": "^4.21.2",
     "jsqr": "^1.4.0",
     "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "jszip": "^3.10.1",
+    "qrcode-generator": "^2.0.4"
   }
 }

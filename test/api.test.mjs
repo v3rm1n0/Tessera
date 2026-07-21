@@ -230,6 +230,57 @@ test('subsections: tickets carry them, scan label shows "Section – Subsection"
   assert.equal((await admin('DELETE', `/api/subsections/${sub.data.id}`)).status, 200);
 });
 
+test('admission card config + backdrop, stored per section (EVENT_ADMIN only)', async () => {
+  assert.equal((await owner('GET', `/api/sections/${sectionId}/card`)).status, 403);
+
+  const cfg0 = await admin('GET', `/api/sections/${sectionId}/card`);
+  assert.equal(cfg0.status, 200);
+  assert.equal(cfg0.data.section, 'Audio Video');
+  assert.match(cfg0.data.color, /^#[0-9a-f]{6}$/i);
+  assert.equal(cfg0.data.has_backdrop, false);
+
+  assert.equal((await admin('PUT', `/api/sections/${sectionId}/card`,
+    { title: 'VOREINLASS-AUSWEIS', text: 'Liebe Schwester, lieber Bruder!' })).status, 200);
+  const cfg1 = await admin('GET', `/api/sections/${sectionId}/card`);
+  assert.equal(cfg1.data.title, 'VOREINLASS-AUSWEIS');
+  assert.equal(cfg1.data.text, 'Liebe Schwester, lieber Bruder!');
+
+  // upload raw backdrop bytes
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const up = await fetch(base + `/api/sections/${sectionId}/card/backdrop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'image/png', cookie: jars.admin },
+    body: png,
+  });
+  assert.equal(up.status, 201);
+  assert.equal((await admin('GET', `/api/sections/${sectionId}/card`)).data.has_backdrop, true);
+
+  // serve it back verbatim
+  const img = await fetch(base + `/api/sections/${sectionId}/card/backdrop`, { headers: { cookie: jars.admin } });
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Buffer.from(await img.arrayBuffer()), png);
+
+  // ?token= works for <img> access
+  const { token } = (await (await fetch(base + '/api/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'eva', password: 'pw-eva' }),
+  })).json());
+  assert.equal((await fetch(base + `/api/sections/${sectionId}/card/backdrop?token=${token}`)).status, 200);
+
+  // wrong mime rejected, scanner cannot edit
+  const bad = await fetch(base + `/api/sections/${sectionId}/card/backdrop`, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain', cookie: jars.admin }, body: 'x',
+  });
+  assert.equal(bad.status, 400);
+  assert.equal((await scanner('PUT', `/api/sections/${sectionId}/card`, { title: 'x' })).status, 403);
+
+  // delete
+  assert.equal((await admin('DELETE', `/api/sections/${sectionId}/card/backdrop`)).status, 200);
+  assert.equal((await admin('GET', `/api/sections/${sectionId}/card`)).data.has_backdrop, false);
+  assert.equal((await fetch(base + `/api/sections/${sectionId}/card/backdrop`, { headers: { cookie: jars.admin } })).status, 404);
+});
+
 test('sections, UUIDs and QR codes are EVENT_ADMIN-only', async () => {
   assert.equal((await owner('POST', `/api/events/${eventId}/sections`, { name: 'X' })).status, 403);
   assert.equal((await owner('POST', `/api/sections/${sectionId}/tickets`, { count: 1 })).status, 403);

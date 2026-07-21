@@ -8,6 +8,7 @@ import { renderDashboard } from './views/dashboard.js';
 import { renderSectionDetail } from './views/section.js';
 import { renderScanner } from './views/scanner.js';
 import { renderAdmin } from './views/admin.js';
+import { renderCardEditor } from './views/card.js';
 
 export const state = {
   user: null,        // { id, username, role, events: [...] }
@@ -56,6 +57,7 @@ const ROUTES = [
   { path: /^#\/sections\/(\d+)$/, title: 'Abteilung', render: renderSectionDetail, roles: EVENT_ROLES },
   { path: /^#\/scanner$/, title: 'Scannen', render: renderScanner, bare: true, roles: EVENT_ROLES },
   { path: /^#\/verwaltung$/, title: 'Verwaltung', render: renderAdmin, roles: ['OWNER', 'EVENT_ADMIN'] },
+  { path: /^#\/karte\/(\d+)$/, title: 'Einlasskarte', render: renderCardEditor, roles: ['EVENT_ADMIN'] },
 ];
 
 /** The owner administrates only; day-to-day views belong to the event roles. */

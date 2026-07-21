@@ -186,12 +186,14 @@ input.color-input {
 .btn.danger { background: var(--danger-dim); color: var(--danger); border: 1px solid var(--danger); }
 .btn.sm { padding: 5px 10px; font-size: 13px; border-radius: 6px; }
 
-input[type=text], input[type=password], input[type=number], input[type=time], select {
+input[type=text], input[type=password], input[type=number], input[type=time], select, textarea {
   background: var(--bg-panel); color: var(--text);
   border: 1px solid var(--border); border-radius: 8px;
   padding: 9px 12px; width: 100%;
+  font-family: inherit;
 }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+textarea { resize: vertical; line-height: 1.5; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 label.field { display: block; margin-bottom: 12px; font-size: 13.5px; color: var(--text-dim); }
 label.field > span { display: block; margin-bottom: 5px; }
 .inline-form { display: flex; gap: 8px; align-items: center; }
@@ -199,6 +201,24 @@ label.field > span { display: block; margin-bottom: 5px; }
 
 .section-head { display: flex; align-items: center; gap: 10px; margin: 26px 0 12px; }
 .section-head h2 { font-size: 15px; margin: 0; flex: 1; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* admission card editor */
+.card-editor { display: grid; grid-template-columns: 1fr minmax(280px, 360px); gap: 22px; align-items: start; }
+.card-controls { min-width: 0; }
+.card-preview-wrap {
+  position: sticky; top: 82px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; text-align: center;
+}
+.card-preview {
+  width: 100%; max-width: 320px; height: auto;
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+}
+@media (max-width: 720px) {
+  .card-editor { grid-template-columns: 1fr; }
+  .card-preview-wrap { position: static; order: -1; }
+  .card-preview { max-width: 240px; }
+}
 
 .error-text { color: var(--danger); font-size: 14px; margin: 8px 0; }
 .muted { color: var(--text-dim); }

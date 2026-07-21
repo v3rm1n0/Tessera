@@ -99,6 +99,12 @@ db.exec(`
 addColumnIfMissing('tickets', 'subsection_id',
   'INTEGER REFERENCES subsections(id) ON DELETE SET NULL');
 
+// admission card (Einlasskarte) configuration per section
+addColumnIfMissing('sections', 'card_title', "TEXT NOT NULL DEFAULT ''");
+addColumnIfMissing('sections', 'card_text', "TEXT NOT NULL DEFAULT ''");
+addColumnIfMissing('sections', 'card_backdrop', 'BLOB');
+addColumnIfMissing('sections', 'card_backdrop_mime', 'TEXT');
+
 // ------------------------------------------------------------------ colors
 
 /** Distinct, dashboard-friendly palette for randomly assigned section colors. */

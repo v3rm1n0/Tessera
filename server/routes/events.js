@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import QRCode from 'qrcode';
 import ExcelJS from 'exceljs';
@@ -146,6 +146,67 @@ function sectionTickets(sectionId) {
 
 eventsRouter.get('/sections/:sectionId/tickets', manage, requireSectionAccess, (req, res) => {
   res.json(sectionTickets(req.section.id));
+});
+
+// ----------------------------------------------------- admission cards
+//
+// The card layout is composited client-side on a <canvas> (title, body
+// text, QR and the section color) and exported as PNG. The server only
+// stores the editable config (title, body text, backdrop image) per
+// section — no native image library is needed on the server.
+
+const CARD_MIMES = ['image/png', 'image/jpeg', 'image/webp'];
+
+eventsRouter.get('/sections/:sectionId/card', manage, requireSectionAccess, (req, res) => {
+  const s = db.prepare(
+    'SELECT color, card_title, card_text, card_backdrop_mime FROM sections WHERE id = ?'
+  ).get(req.section.id);
+  res.json({
+    section: req.section.name,
+    color: s.color,
+    title: s.card_title,
+    text: s.card_text,
+    has_backdrop: !!s.card_backdrop_mime,
+  });
+});
+
+eventsRouter.put('/sections/:sectionId/card', manage, requireSectionAccess, (req, res) => {
+  const title = String(req.body?.title ?? '').slice(0, 200);
+  const text = String(req.body?.text ?? '').slice(0, 4000);
+  db.prepare('UPDATE sections SET card_title = ?, card_text = ? WHERE id = ?')
+    .run(title, text, req.section.id);
+  res.json({ ok: true });
+});
+
+eventsRouter.post('/sections/:sectionId/card/backdrop',
+  manage, requireSectionAccess,
+  express.raw({ type: CARD_MIMES, limit: '8mb' }),
+  (req, res) => {
+    const mime = req.headers['content-type'];
+    if (!CARD_MIMES.includes(mime)) {
+      return res.status(400).json({ error: 'Nur PNG, JPEG oder WebP erlaubt' });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Bilddaten fehlen' });
+    }
+    db.prepare('UPDATE sections SET card_backdrop = ?, card_backdrop_mime = ? WHERE id = ?')
+      .run(req.body, mime, req.section.id);
+    res.status(201).json({ ok: true });
+  });
+
+eventsRouter.get('/sections/:sectionId/card/backdrop', manage, requireSectionAccess, (req, res) => {
+  const s = db.prepare('SELECT card_backdrop, card_backdrop_mime FROM sections WHERE id = ?')
+    .get(req.section.id);
+  if (!s.card_backdrop) return res.status(404).json({ error: 'Kein Hintergrundbild' });
+  res.setHeader('Content-Type', s.card_backdrop_mime);
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(Buffer.from(s.card_backdrop));
+});
+
+eventsRouter.delete('/sections/:sectionId/card/backdrop', manage, requireSectionAccess, (req, res) => {
+  db.prepare('UPDATE sections SET card_backdrop = NULL, card_backdrop_mime = NULL WHERE id = ?')
+    .run(req.section.id);
+  res.json({ ok: true });
 });
 
 // ------------------------------------------------------------ Excel export
