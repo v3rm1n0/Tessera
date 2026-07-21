@@ -36,7 +36,7 @@ export function createApp() {
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     console.error(err);
-    res.status(500).json({ error: 'Interner Serverfehler' });
+    res.status(500).json({ error: 'Internal server error' });
   });
   return app;
 }
@@ -52,7 +52,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const port = Number(process.env.PORT || 3000);
   createApp().listen(port, () => {
-    console.log(`Voreinlass läuft auf http://localhost:${port}`);
-    console.log('Hinweis: Kamera-Zugriff im Browser erfordert HTTPS oder localhost.');
+    console.log(`Voreinlass is running on http://localhost:${port}`);
+    console.log('Note: Camera access in browser requires HTTPS or localhost.');
   });
 }
