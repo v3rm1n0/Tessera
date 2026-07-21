@@ -1,5 +1,6 @@
 import { api } from '../api.js';
 import { el } from '../app.js';
+import { t, dateLocale } from '../i18n.js';
 
 const RESULT_SHOW_MS = 2200;   // how long a result overlay stays before rescanning
 const SAME_CODE_COOLDOWN_MS = 6000; // ignore re-reads of the same code in this window
@@ -11,7 +12,7 @@ export async function renderScanner(content) {
   const view = el('div', { class: 'scanner-view' },
     video,
     el('div', { class: 'scan-frame' }, el('div', { class: 'reticle' })),
-    el('div', { class: 'scan-hint' }, 'QR-Code in den Rahmen halten'),
+    el('div', { class: 'scan-hint' }, t('scan.hint')),
     overlay);
   content.replaceChildren(view);
 
@@ -35,9 +36,9 @@ export async function renderScanner(content) {
   } catch {
     view.replaceChildren(el('div', { class: 'camera-error' },
       el('div', {},
-        el('p', {}, '📷 Kein Kamera-Zugriff.'),
+        el('p', {}, t('scan.noCamera')),
         el('p', { class: 'muted' },
-          'Bitte Kamera-Berechtigung erteilen. Hinweis: Der Zugriff funktioniert nur über HTTPS oder localhost.'))));
+          t('scan.cameraHelp')))));
     return () => {};
   }
 
@@ -82,25 +83,25 @@ export async function renderScanner(content) {
     let box;
     if (r.status === 'OK') {
       box = el('div', { class: 'scan-result ok' },
-        el('div', { class: 'big' }, 'OK'),
+        el('div', { class: 'big' }, t('scan.ok')),
         el('div', { class: 'num' }, String(r.scan_number)),
         el('div', { class: 'detail' }, r.section || ''),
-        el('div', { class: 'tap' }, 'Tippen zum Fortfahren'));
+        el('div', { class: 'tap' }, t('scan.tap')));
     } else if (r.status === 'DOUBLE') {
       box = el('div', { class: 'scan-result double' },
-        el('div', { class: 'big' }, 'Doppelt!'),
-        el('div', { class: 'detail' }, 'Dieser Code wurde bereits gescannt:'),
+        el('div', { class: 'big' }, t('scan.double')),
+        el('div', { class: 'detail' }, t('scan.alreadyScanned')),
         el('div', { class: 'uuid' }, r.uuid),
         r.first_scanned_at
           ? el('div', { class: 'detail' },
-              `Erster Scan: ${new Date(r.first_scanned_at).toLocaleTimeString('de-DE')} Uhr`)
+              t('scan.firstScan', { time: new Date(r.first_scanned_at).toLocaleTimeString(dateLocale()) }))
           : null,
-        el('div', { class: 'tap' }, 'Tippen zum Fortfahren'));
+        el('div', { class: 'tap' }, t('scan.tap')));
     } else {
       box = el('div', { class: 'scan-result error' },
-        el('div', { class: 'big' }, 'Error'),
-        el('div', { class: 'detail' }, r.message || 'Code ungültig'),
-        el('div', { class: 'tap' }, 'Tippen zum Fortfahren'));
+        el('div', { class: 'big' }, t('scan.errorTitle')),
+        el('div', { class: 'detail' }, r.message || t('scan.invalid')),
+        el('div', { class: 'tap' }, t('scan.tap')));
     }
     box.addEventListener('click', dismiss);
     overlay.replaceChildren(box);
