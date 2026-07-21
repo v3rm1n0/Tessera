@@ -36,25 +36,55 @@ export function qrMatrix(text) {
  * Draws wrapped body text. Lines above `narrowFromY` use the full width;
  * lines level with the QR use the narrow left column so text flows around it.
  */
-function layoutBody(ctx, text, x, yStart, lh, { fullW, narrowW, narrowFromY, maxY }) {
+
+/** Split a paragraph into word tokens, toggling bold on each `**` marker. */
+export function boldWords(paragraph) {
+  const words = [];
+  let isBold = false;
+  for (const seg of paragraph.split('**')) {
+    for (const w of seg.split(/\s+/).filter(Boolean)) words.push({ text: w, bold: isBold });
+    isBold = !isBold;
+  }
+  return words;
+}
+
+function drawRichText(ctx, text, x, yStart, { fontSize, fontFamily, lh, fullW, narrowW, narrowFromY, maxY }) {
+  const regularFont = `400 ${fontSize}px ${fontFamily}`;
+  const boldFont = `700 ${fontSize}px ${fontFamily}`;
+  ctx.font = regularFont;
+  const spaceW = ctx.measureText(' ').width;
   let y = yStart;
+
   for (const paragraph of text.split('\n')) {
-    if (paragraph === '') { y += lh * 0.55; continue; }
-    let line = '';
-    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-      const width = y + lh > narrowFromY ? narrowW : fullW;
-      const test = line ? `${line} ${word}` : word;
-      if (line && ctx.measureText(test).width > width) {
-        ctx.fillText(line, x, y);
-        y += lh;
-        line = word;
+    if (paragraph.trim() === '') { y += lh * 0.55; continue; }
+    let line = [];
+    let lineW = 0;
+    const flush = () => {
+      let cx = x;
+      for (const wd of line) {
+        ctx.font = wd.bold ? boldFont : regularFont;
+        ctx.fillText(wd.text, cx, y);
+        cx += wd.w + spaceW;
+      }
+      y += lh;
+      line = [];
+      lineW = 0;
+    };
+    for (const wd of boldWords(paragraph)) {
+      ctx.font = wd.bold ? boldFont : regularFont;
+      wd.w = ctx.measureText(wd.text).width;
+      const add = (line.length ? spaceW : 0) + wd.w;
+      if (line.length && lineW + add > (y + lh > narrowFromY ? narrowW : fullW)) {
+        flush();
         if (y > maxY) return;
+        line = [wd];
+        lineW = wd.w;
       } else {
-        line = test;
+        line.push(wd);
+        lineW += add;
       }
     }
-    if (line) { ctx.fillText(line, x, y); y += lh; }
-    if (y > maxY) return;
+    if (line.length) { flush(); if (y > maxY) return; }
   }
 }
 
@@ -151,9 +181,10 @@ export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   const bodyFs = 30;
-  const lh = bodyFs * 1.36;
-  ctx.font = `400 ${bodyFs}px system-ui, "Segoe UI", sans-serif`;
-  layoutBody(ctx, text || '', pad, lowerY + 44, lh, {
+  drawRichText(ctx, text || '', pad, lowerY + 44, {
+    fontSize: bodyFs,
+    fontFamily: 'system-ui, "Segoe UI", sans-serif',
+    lh: bodyFs * 1.36,
     fullW: CARD_W - pad * 2,
     narrowW: qrX - pad - 30,
     narrowFromY: qrY - 8,
@@ -163,14 +194,16 @@ export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }
   if (matrix) drawQr(ctx, matrix, qrX, qrY, qrSize);
 
   // section (– subsection) label under the QR
-  ctx.fillStyle = ink;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  let lfs = 30;
-  ctx.font = `700 ${lfs}px system-ui, "Segoe UI", sans-serif`;
-  while (ctx.measureText(label).width > qrSize + 44 && lfs > 15) {
-    lfs -= 1;
+  if (label) {
+    ctx.fillStyle = ink;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let lfs = 30;
     ctx.font = `700 ${lfs}px system-ui, "Segoe UI", sans-serif`;
+    while (ctx.measureText(label).width > qrSize + 44 && lfs > 15) {
+      lfs -= 1;
+      ctx.font = `700 ${lfs}px system-ui, "Segoe UI", sans-serif`;
+    }
+    ctx.fillText(label, qrX + qrSize / 2, qrY + qrSize + labelGap);
   }
-  ctx.fillText(label, qrX + qrSize / 2, qrY + qrSize + labelGap);
 }

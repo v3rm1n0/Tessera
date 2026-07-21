@@ -52,6 +52,20 @@ export async function renderCardEditor(content, eventId) {
   titleInput.addEventListener('input', preview);
   textInput.addEventListener('input', preview);
 
+  // wrap the current selection in **…** for bold
+  const boldBtn = el('button', { type: 'button', class: 'btn secondary sm', title: 'Auswahl fett' }, 'F');
+  boldBtn.style.fontWeight = '800';
+  boldBtn.addEventListener('click', () => {
+    const start = textInput.selectionStart;
+    const end = textInput.selectionEnd;
+    const v = textInput.value;
+    const sel = v.slice(start, end) || 'Text';
+    textInput.value = `${v.slice(0, start)}**${sel}**${v.slice(end)}`;
+    textInput.focus();
+    textInput.setSelectionRange(start + 2, start + 2 + sel.length);
+    preview();
+  });
+
   // ---- save config
   const saveBtn = el('button', { class: 'btn' }, 'Speichern');
   saveBtn.addEventListener('click', async () => {
@@ -175,7 +189,12 @@ export async function renderCardEditor(content, eventId) {
     el('div', { class: 'card-editor' },
       el('div', { class: 'card-controls' },
         el('label', { class: 'field' }, el('span', {}, 'Titel'), titleInput),
-        el('label', { class: 'field' }, el('span', {}, 'Text'), textInput),
+        el('div', { class: 'field' },
+          el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:5px' },
+            el('span', { style: 'margin:0' }, 'Text'),
+            boldBtn,
+            el('span', { class: 'muted', style: 'font-size:12px' }, 'oder **…** für Fettdruck')),
+          textInput),
         el('div', { class: 'field' },
           el('span', {}, 'Hintergrundbild'),
           el('div', { class: 'inline-form', style: 'flex-wrap:wrap' }, fileInput, uploadBtn, removeBtn)),

@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 global.window = { qrcode: require('../node_modules/qrcode-generator/dist/qrcode.js') };
 
-const { drawCard, contrastColor, qrMatrix, CARD_W, CARD_H } =
+const { drawCard, contrastColor, qrMatrix, boldWords, CARD_W, CARD_H } =
   await import('../public/js/card-render.js');
 
 /** Minimal 2D-context stub that records draw calls and swallows property sets. */
@@ -24,7 +24,7 @@ function stubCtx() {
   };
   return new Proxy(target, {
     get: (t, p) => (p in t ? t[p] : undefined),
-    set: () => true, // ignore fillStyle/font/shadow/textAlign/...
+    set: (t, p, v) => { if (p === 'font') (calls.fonts ??= []).push(v); return true; },
   });
 }
 
@@ -53,6 +53,35 @@ test('drawCard renders without a backdrop (text + QR drawn, no image)', () => {
   assert.equal(ctx.calls.drawImage, 0);
   assert.ok(ctx.calls.fillText >= 3);   // title + body lines + label
   assert.ok(ctx.calls.fillRect > 50);   // background + QR modules
+});
+
+test('boldWords toggles bold on ** markers', () => {
+  assert.deepEqual(boldWords('a **b c** d'), [
+    { text: 'a', bold: false },
+    { text: 'b', bold: true },
+    { text: 'c', bold: true },
+    { text: 'd', bold: false },
+  ]);
+  assert.deepEqual(boldWords('plain text'), [
+    { text: 'plain', bold: false }, { text: 'text', bold: false },
+  ]);
+});
+
+test('drawCard renders a 700-weight run for **bold** body text', () => {
+  const plain = stubCtx();
+  drawCard(plain, {
+    color: '#4f9cf5', title: '', text: 'nur normaler text hier ganz simpel',
+    label: '', backdropImg: null, matrix: null,
+  });
+  const bold = stubCtx();
+  drawCard(bold, {
+    color: '#4f9cf5', title: '', text: 'ein **fetter** teil im text',
+    label: '', backdropImg: null, matrix: null,
+  });
+  const boldRuns = f => (f.calls.fonts || []).filter(x => x.startsWith('700 30px')).length;
+  // no title/label/QR here, so a 30px-700 font only appears from bold body words
+  assert.equal(boldRuns(plain), 0);
+  assert.ok(boldRuns(bold) >= 1);
 });
 
 test('drawCard draws the backdrop image when provided', () => {
