@@ -1,0 +1,69 @@
+# Voreinlass entry monitoring — systemd unit for Debian
+#
+# Install:
+#   1. Node.js >= 24 (needed for the built-in node:sqlite), e.g. via NodeSource:
+#        curl -fsSL https://deb.nodesource.com/setup_24.x | sudo bash -
+#        sudo apt-get install -y nodejs
+#   2. Deploy the app:
+#        sudo mkdir -p /opt/voreinlass
+#        sudo rsync -a --exclude node_modules --exclude data ./ /opt/voreinlass/
+#        cd /opt/voreinlass && sudo npm ci --omit=dev
+#   3. Optional secrets (initial owner password):
+#        echo 'OWNER_PASSWORD=change-me' | sudo tee /etc/voreinlass/env
+#        sudo chmod 600 /etc/voreinlass/env
+#   4. Enable:
+#        sudo cp deploy/voreinlass.service /etc/systemd/system/
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now voreinlass
+#
+# The SQLite database lands in /var/lib/voreinlass (created automatically via
+# StateDirectory). Put a TLS reverse proxy (nginx/Caddy) in front — the
+# scanner needs HTTPS for camera access.
+
+[Unit]
+Description=Voreinlass entry monitoring
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/voreinlass
+ExecStart=/usr/bin/node server/index.js
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=DATA_DIR=/var/lib/voreinlass
+EnvironmentFile=-/etc/voreinlass/env
+
+Restart=always
+RestartSec=3
+
+# runs as an ephemeral unprivileged user; /var/lib/voreinlass is its only
+# writable state
+DynamicUser=yes
+StateDirectory=voreinlass
+StateDirectoryMode=0700
+UMask=0077
+
+# hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

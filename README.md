@@ -71,6 +71,20 @@ GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles
 POST   /api/scan                     { code: "<uuid>" }
 ```
 
+## Owner-Passwort vergessen?
+
+Die Zugangsdaten werden nur beim allerersten Start ausgegeben
+(auf dem Server: `journalctl -u voreinlass | grep -A3 'Owner-Konto'`).
+Zurücksetzen jederzeit mit:
+
+```sh
+node server/reset-owner.js [neues-passwort]          # lokal
+DATA_DIR=/var/lib/voreinlass node server/reset-owner.js   # auf dem Server (sudo)
+```
+
+Ohne Argument wird ein zufälliges Passwort erzeugt und angezeigt.
+Bestehende Owner-Sessions werden dabei abgemeldet.
+
 ## Tests
 
 ```sh
