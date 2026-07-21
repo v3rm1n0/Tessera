@@ -7,11 +7,7 @@ import { t } from '../i18n.js';
 const PLACEHOLDER_UUID = '00000000-0000-4000-8000-000000000000';
 const safe = s => s.replace(/[^\p{L}\p{N}_-]+/gu, '_');
 
-/**
- * Admission-card editor (EVENT_ADMIN). The card is defined once per event;
- * every ticket of every section is exported at once as PNGs in a ZIP,
- * each using its section color and "Section – Subsection" label.
- */
+/** Admission-card editor (EVENT_ADMIN): defined once per event, exported as PNGs in a ZIP per ticket. */
 export async function renderCardEditor(content, eventId) {
   let cfg;
   try {
@@ -24,7 +20,6 @@ export async function renderCardEditor(content, eventId) {
   const sample = cfg.sample || { color: '#4f9cf5', label: t('card.sampleLabel') };
   let backdropImg = null;
 
-  // ---- controls
   const titleInput = el('input', {
     type: 'text', maxlength: '200',
     value: cfg.title || t('card.defaultTitle'),
@@ -53,7 +48,6 @@ export async function renderCardEditor(content, eventId) {
   titleInput.addEventListener('input', preview);
   textInput.addEventListener('input', preview);
 
-  // wrap the current selection in **…** for bold
   const boldBtn = el('button', { type: 'button', class: 'btn secondary sm', title: t('card.boldTitle') }, 'F');
   boldBtn.style.fontWeight = '800';
   boldBtn.addEventListener('click', () => {
@@ -67,7 +61,6 @@ export async function renderCardEditor(content, eventId) {
     preview();
   });
 
-  // ---- save config
   const saveBtn = el('button', { class: 'btn' }, t('card.save'));
   saveBtn.addEventListener('click', async () => {
     saveBtn.disabled = true;
@@ -80,7 +73,6 @@ export async function renderCardEditor(content, eventId) {
     } catch (err) { alert(err.message); saveBtn.disabled = false; }
   });
 
-  // ---- backdrop
   function loadBackdrop() {
     if (!cfg.has_backdrop) { backdropImg = null; preview(); return; }
     const img = new Image();
@@ -124,7 +116,6 @@ export async function renderCardEditor(content, eventId) {
     } catch (err) { alert(err.message); }
   });
 
-  // ---- export
   const progress = el('span', { class: 'muted', style: 'font-size:13px' });
 
   function download(blob, name) {
@@ -147,7 +138,6 @@ export async function renderCardEditor(content, eventId) {
     off.toBlob(blob => download(blob, `Einlasskarte-${safe(cfg.event)}-${t('card.previewSuffix')}.png`), 'image/png');
   });
 
-  // optional: drop a UUID-list Excel into each section/subsection folder
   const xlsxCheckbox = el('input', { type: 'checkbox', id: 'incl-xlsx', style: 'width:auto;margin:0' });
   const xlsxLabel = el('label', {
     for: 'incl-xlsx',
@@ -175,7 +165,6 @@ export async function renderCardEditor(content, eventId) {
           label, backdropImg, matrix: qrMatrix(tk.uuid),
         });
         const blob = await new Promise(r => off.toBlob(r, 'image/png'));
-        // dedicated folder per section, subfolder per subsection
         const dir = tk.subsection
           ? zip.folder(safe(tk.section)).folder(safe(tk.subsection))
           : zip.folder(safe(tk.section));
@@ -205,7 +194,6 @@ export async function renderCardEditor(content, eventId) {
     bulkBtn.disabled = false;
   });
 
-  // ---- layout
   content.replaceChildren(
     el('button', { class: 'btn secondary sm', onclick: () => history.back() }, t('common.back')),
     el('div', { class: 'section-head' }, el('h2', {}, t('card.heading', { name: cfg.event }))),

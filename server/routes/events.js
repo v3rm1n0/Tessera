@@ -4,14 +4,9 @@ import ExcelJS from 'exceljs';
 import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
 
-/**
- * EventAdmin functionality. Deliberately EVENT_ADMIN-only: sections, UUIDs
- * and QR codes are managed exclusively by the event admins of an event.
- */
+/** Event Admin functionality: sections, UUIDs and QR codes are managed exclusively by the event's admins. */
 export const eventsRouter = Router();
 const manage = requireRole('EVENT_ADMIN');
-
-// ------------------------------------------------------------- reset time
 
 eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) => {
   const resetTime = req.body?.reset_time;
@@ -21,8 +16,6 @@ eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) =>
   db.prepare('UPDATE events SET reset_time = ? WHERE id = ?').run(resetTime, req.event.id);
   res.json({ ...req.event, reset_time: resetTime });
 });
-
-// --------------------------------------------------------------- sections
 
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
@@ -62,8 +55,6 @@ eventsRouter.delete('/sections/:sectionId', manage, requireSectionAccess, (req, 
   res.json({ ok: true });
 });
 
-// ------------------------------------------------------------- subsections
-
 eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAccess, (req, res) => {
   const name = (req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -96,8 +87,6 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
   db.prepare('DELETE FROM subsections WHERE id = ?').run(sub.id);
   res.json({ ok: true });
 });
-
-// ---------------------------------------------------------------- tickets
 
 eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, (req, res) => {
   const count = Number(req.body?.count);
@@ -141,14 +130,8 @@ eventsRouter.get('/sections/:sectionId/tickets', manage, requireSectionAccess, (
   res.json(sectionTickets(req.section.id));
 });
 
-// ----------------------------------------------------- admission cards
-//
-// The admission card is defined ONCE per event (title, body text, backdrop
-// image); the section color is the per-card main color and the QR + label
-// ("Section – Subsection") are filled in per ticket. Cards are composited
-// client-side on a <canvas> and exported as PNG in bulk — the server stores
-// only the config and needs no native image library.
-
+// admission card: defined once per event (title, text, backdrop); cards are
+// composited client-side on a <canvas>, so the server only stores the config
 const CARD_MIMES = ['image/png', 'image/jpeg', 'image/webp'];
 
 eventsRouter.get('/events/:eventId/card', manage, requireEventAccess, (req, res) => {
@@ -228,13 +211,7 @@ eventsRouter.get('/events/:eventId/card/tickets', manage, requireEventAccess, (r
   `).all(req.event.id));
 });
 
-/**
- * One small UUID-list workbook per folder of the card export: grouped by
- * subsection, plus a group per section for its direct (no-subsection)
- * tickets. Columns are just the label, the UUID and an empty recipient
- * column so section/subsection heads can tick off who received which code.
- * Returned as base64 so the client can drop each into the matching folder.
- */
+/** One UUID-list workbook per export folder (grouped by section/subsection), returned as base64 for the client to place. */
 eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async (req, res) => {
   const rows = db.prepare(`
     SELECT t.uuid, s.id AS section_id, s.name AS section,
@@ -272,8 +249,6 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
   }
   res.json({ groups: out });
 });
-
-// ------------------------------------------------------------ Excel export
 
 eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, async (req, res) => {
   const sections = db.prepare('SELECT * FROM sections WHERE event_id = ? ORDER BY name')

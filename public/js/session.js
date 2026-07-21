@@ -1,8 +1,4 @@
-/**
- * Client-side account store for the account switcher.
- * Several accounts can be logged in at once; each keeps its own session
- * token and the active one is sent as a bearer token by api.js.
- */
+/** Account store for the switcher: several accounts can be logged in at once, each with its own session token. */
 const KEY = 'voreinlass_accounts';
 const ACTIVE = 'voreinlass_active';
 

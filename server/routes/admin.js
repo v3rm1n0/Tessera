@@ -6,8 +6,6 @@ import { requireRole } from '../auth.js';
 export const adminRouter = Router();
 adminRouter.use(requireRole('OWNER'));
 
-// ------------------------------------------------------------------ users
-
 adminRouter.get('/users', (req, res) => {
   const users = db.prepare(`
     SELECT u.id, u.username, u.role, u.created_at,
@@ -46,8 +44,6 @@ adminRouter.delete('/users/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ------------------------------------------------------------------ events
-
 adminRouter.post('/events', (req, res) => {
   const name = (req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -64,8 +60,6 @@ adminRouter.delete('/events/:id', (req, res) => {
   if (info.changes === 0) return res.status(404).json({ error: 'Event not found' });
   res.json({ ok: true });
 });
-
-// -------------------------------------------------------------- assignments
 
 /** Creates an account and assigns it to the event in one step. */
 adminRouter.post('/events/:id/users', (req, res) => {

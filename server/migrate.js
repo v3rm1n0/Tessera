@@ -1,18 +1,13 @@
 import { fileURLToPath } from 'node:url';
 
 /**
- * Versioned, idempotent schema migrations.
- *
- * Each migration has a stable `id` and an `up(db)` that is safe to run on a
- * fresh database as well as on one that already contains the final schema
- * (older builds set up the schema inline). Applied ids are recorded in
- * `schema_migrations`, so every migration runs at most once per database.
- *
- * Run standalone with:  node server/migrate.js   (or: npm run migrate)
- * The app also applies pending migrations automatically on startup.
+ * Versioned, idempotent schema migrations. Each has a stable `id` and an
+ * `up(db)` safe to run on a fresh db or one already at the final schema.
+ * Applied ids are recorded in `schema_migrations`, so each runs once.
+ * Run standalone with: node server/migrate.js (or: npm run migrate).
  */
 
-// ---- small helpers (self-contained: migrations must not depend on app code)
+// self-contained: migrations must not depend on app code
 
 function columns(db, table) {
   return db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
@@ -37,8 +32,6 @@ const LEGACY_PALETTE = [
   '#f0556a', '#3fc1c9', '#a3d94e', '#f5d90a', '#fa8c5c',
   '#6ee7f0', '#c98850',
 ];
-
-// ---- the migrations, in order
 
 export const MIGRATIONS = [
   {
@@ -151,10 +144,7 @@ export const MIGRATIONS = [
   },
 ];
 
-/**
- * Applies every not-yet-applied migration in order, each in its own
- * transaction. Returns the ids that were applied this run.
- */
+/** Applies every not-yet-applied migration in order, each in its own transaction; returns the applied ids. */
 export function runMigrations(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -181,8 +171,6 @@ export function runMigrations(db) {
   }
   return justApplied;
 }
-
-// ---- CLI: node server/migrate.js
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { db } = await import('./db.js');
