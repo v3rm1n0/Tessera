@@ -1,0 +1,86 @@
+import { Router } from 'express';
+import { db, hashPassword } from '../db.js';
+import { requireRole } from '../auth.js';
+
+/** Owner-only administration: accounts, events, assignments. */
+export const adminRouter = Router();
+adminRouter.use(requireRole('OWNER'));
+
+// ------------------------------------------------------------------ users
+
+adminRouter.get('/users', (req, res) => {
+  const users = db.prepare(`
+    SELECT u.id, u.username, u.role, u.created_at,
+           json_group_array(a.event_id) FILTER (WHERE a.event_id IS NOT NULL) AS event_ids
+    FROM users u LEFT JOIN event_assignments a ON a.user_id = u.id
+    GROUP BY u.id ORDER BY u.username
+  `).all();
+  res.json(users.map(u => ({ ...u, event_ids: JSON.parse(u.event_ids) })));
+});
+
+adminRouter.post('/users', (req, res) => {
+  const { username, password, role } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+  }
+  if (!['EVENT_ADMIN', 'SCANNER'].includes(role)) {
+    return res.status(400).json({ error: 'Rolle muss EVENT_ADMIN oder SCANNER sein' });
+  }
+  try {
+    const info = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+      .run(username.trim(), hashPassword(password), role);
+    res.status(201).json({ id: Number(info.lastInsertRowid), username: username.trim(), role });
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) {
+      return res.status(409).json({ error: 'Benutzername bereits vergeben' });
+    }
+    throw e;
+  }
+});
+
+adminRouter.delete('/users/:id', (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.user.id) return res.status(400).json({ error: 'Eigenes Konto kann nicht gelöscht werden' });
+  const info = db.prepare("DELETE FROM users WHERE id = ? AND role != 'OWNER'").run(id);
+  if (info.changes === 0) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+  res.json({ ok: true });
+});
+
+// ------------------------------------------------------------------ events
+
+adminRouter.post('/events', (req, res) => {
+  const name = (req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Name erforderlich' });
+  const info = db.prepare('INSERT INTO events (name) VALUES (?)').run(name);
+  res.status(201).json({ id: Number(info.lastInsertRowid), name, reset_time: '00:00' });
+});
+
+adminRouter.get('/events', (req, res) => {
+  res.json(db.prepare('SELECT * FROM events ORDER BY name').all());
+});
+
+adminRouter.delete('/events/:id', (req, res) => {
+  const info = db.prepare('DELETE FROM events WHERE id = ?').run(Number(req.params.id));
+  if (info.changes === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
+  res.json({ ok: true });
+});
+
+// -------------------------------------------------------------- assignments
+
+adminRouter.post('/events/:id/assignments', (req, res) => {
+  const eventId = Number(req.params.id);
+  const userId = Number(req.body?.userId);
+  const event = db.prepare('SELECT id FROM events WHERE id = ?').get(eventId);
+  const user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(userId);
+  if (!event || !user) return res.status(404).json({ error: 'Event oder Benutzer nicht gefunden' });
+  if (user.role === 'OWNER') return res.status(400).json({ error: 'Owner benötigt keine Zuweisung' });
+  db.prepare('INSERT OR IGNORE INTO event_assignments (user_id, event_id) VALUES (?, ?)')
+    .run(userId, eventId);
+  res.status(201).json({ ok: true });
+});
+
+adminRouter.delete('/events/:id/assignments/:userId', (req, res) => {
+  db.prepare('DELETE FROM event_assignments WHERE event_id = ? AND user_id = ?')
+    .run(Number(req.params.id), Number(req.params.userId));
+  res.json({ ok: true });
+});

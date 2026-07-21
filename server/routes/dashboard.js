@@ -1,0 +1,46 @@
+import { Router } from 'express';
+import { db, resetBoundary } from '../db.js';
+import { requireAuth, requireEventAccess, requireSectionAccess } from '../auth.js';
+
+/** Dashboard data — visible to every role with access to the event. */
+export const dashboardRouter = Router();
+dashboardRouter.use(requireAuth);
+
+dashboardRouter.get('/events/:eventId/dashboard', requireEventAccess, (req, res) => {
+  const since = resetBoundary(req.event.reset_time);
+  const sections = db.prepare(`
+    SELECT s.id, s.name,
+           (SELECT COUNT(*) FROM tickets t WHERE t.section_id = s.id) AS ticket_count,
+           (SELECT COUNT(*) FROM scans sc
+             WHERE sc.section_id = s.id AND sc.result = 'OK' AND sc.scanned_at >= ?) AS scans_today,
+           (SELECT COUNT(DISTINCT sc.ticket_uuid) FROM scans sc
+             WHERE sc.section_id = s.id AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?) AS doubles_today
+    FROM sections s WHERE s.event_id = ? ORDER BY s.name
+  `).all(since, since, req.event.id);
+
+  res.json({
+    event: { id: req.event.id, name: req.event.name, reset_time: req.event.reset_time },
+    reset_boundary: since,
+    total_sections: sections.length,
+    total_scans_today: sections.reduce((sum, s) => sum + s.scans_today, 0),
+    sections,
+  });
+});
+
+/** Detail view: double-scanned codes of a section since the last reset. */
+dashboardRouter.get('/sections/:sectionId/doubles', requireSectionAccess, (req, res) => {
+  const since = resetBoundary(req.event.reset_time);
+  const doubles = db.prepare(`
+    SELECT sc.ticket_uuid AS uuid,
+           COUNT(*) AS attempts,
+           MAX(sc.scanned_at) AS last_attempt_at
+    FROM scans sc
+    WHERE sc.section_id = ? AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?
+    GROUP BY sc.ticket_uuid
+    ORDER BY last_attempt_at DESC
+  `).all(req.section.id, since);
+  res.json({
+    section: { id: req.section.id, name: req.section.name },
+    doubles,
+  });
+});

@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# runtime data (SQLite database)
+data/
+
+# nix
+result
+result-*
+.direnv/
+
+# environment / secrets
+.env
+.env.*
+
+# logs & OS cruft
+*.log
+.DS_Store
