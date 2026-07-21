@@ -18,7 +18,9 @@ dashboardRouter.get('/events/:eventId/dashboard', requireEventAccess, (req, res)
              WHERE sc.section_id = s.id AND sc.result = 'OK' AND sc.scanned_at >= ?) AS scans_today,
            (SELECT COUNT(DISTINCT sc.ticket_uuid) FROM scans sc
              WHERE sc.section_id = s.id AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?) AS doubles_today,
-           (SELECT json_group_array(json_object('id', sub.id, 'name', sub.name))
+           (SELECT json_group_array(json_object(
+                'id', sub.id, 'name', sub.name,
+                'ticket_count', (SELECT COUNT(*) FROM tickets t WHERE t.subsection_id = sub.id)))
              FROM subsections sub WHERE sub.section_id = s.id) AS subsections
     FROM sections s WHERE s.event_id = ? ORDER BY s.name
   `).all(since, since, req.event.id)

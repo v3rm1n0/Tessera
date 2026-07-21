@@ -226,6 +226,7 @@ test('subsections: tickets carry them, scan label shows "Section – Subsection"
 
   const dash = await scanner('GET', `/api/events/${eventId}/dashboard`);
   assert.deepEqual(dash.data.sections[0].subsections.map(x => x.name), ['Innenraum Ordner']);
+  assert.equal(dash.data.sections[0].subsections[0].ticket_count, 1); // one ticket generated above
 
   assert.equal((await admin('DELETE', `/api/subsections/${sub.data.id}`)).status, 200);
 });

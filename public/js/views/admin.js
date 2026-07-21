@@ -188,74 +188,78 @@ async function eventBlock(reload) {
     } catch (err) { flash(err); }
   });
 
-  // --- section rows with ticket generation + QR/export actions
-  const sectionRows = dash.sections.map(s => {
-    const count = el('input', {
-      type: 'number', min: '1', max: '10000', value: '50', style: 'width:90px',
-    });
-    const subSelect = el('select', { style: 'width:auto' },
-      el('option', { value: '' }, 'Ohne Unterabteilung'),
-      s.subsections.map(sub => el('option', { value: sub.id }, sub.name)));
-    const genBtn = el('button', { class: 'btn sm' }, 'UUIDs erzeugen');
-    genBtn.addEventListener('click', async () => {
-      genBtn.disabled = true;
+  // a reusable "count + generate UUIDs" control
+  function uuidGen(url, body, doneLabel) {
+    const count = el('input', { type: 'number', min: '1', max: '10000', value: '50', style: 'width:78px' });
+    const btn = el('button', { class: 'btn sm' }, 'UUIDs erzeugen');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
       try {
-        const r = await api.post(`/api/sections/${s.id}/tickets`, {
-          count: Number(count.value),
-          ...(subSelect.value ? { subsection_id: Number(subSelect.value) } : {}),
-        });
-        const subName = subSelect.selectedOptions[0]?.textContent;
-        alert(`${r.created} UUIDs für „${subSelect.value ? `${s.name} – ${subName}` : s.name}" erzeugt.`);
+        const r = await api.post(url, { count: Number(count.value), ...body });
+        alert(`${r.created} UUIDs für „${doneLabel}" erzeugt.`);
         reload();
-      } catch (err) { flash(err); genBtn.disabled = false; }
+      } catch (err) { flash(err); btn.disabled = false; }
     });
+    return el('div', { class: 'inline-form', style: 'width:auto;flex:0 0 auto' }, count, btn);
+  }
 
-    // subsection chips + add form
-    const subName = el('input', { type: 'text', placeholder: 'Neue Unterabteilung', style: 'max-width:220px' });
-    const subForm = el('form', { class: 'inline-form', style: 'flex-wrap:wrap' },
-      ...s.subsections.map(sub => {
-        const chip = el('button', {
-          type: 'button', class: 'btn secondary sm',
-          title: 'Unterabteilung löschen',
-        }, `${sub.name} ✕`);
-        chip.addEventListener('click', async () => {
-          if (!confirm(`Unterabteilung „${sub.name}" löschen?`)) return;
-          try { await api.del(`/api/subsections/${sub.id}`); reload(); }
-          catch (err) { flash(err); }
-        });
-        return chip;
-      }),
-      subName,
-      el('button', { class: 'btn secondary sm', type: 'submit' }, '+ Hinzufügen'));
-    subForm.addEventListener('submit', async e => {
-      e.preventDefault();
-      try {
-        await api.post(`/api/sections/${s.id}/subsections`, { name: subName.value });
-        reload();
-      } catch (err) { flash(err); }
-    });
+  // --- one card per section; each subsection is a card nested inside it
+  const sectionCards = dash.sections.map(s => {
     const colorInput = el('input', {
-      type: 'color', class: 'color-input', value: s.color,
-      title: 'Farbe der Abteilung',
+      type: 'color', class: 'color-input', value: s.color, title: 'Farbe der Abteilung',
     });
     colorInput.addEventListener('change', async () => {
       try { await api.patch(`/api/sections/${s.id}`, { color: colorInput.value }); reload(); }
       catch (err) { flash(err); }
     });
-    return el('div', { class: 'row', style: 'flex-wrap:wrap' },
-      colorInput,
-      el('div', { class: 'grow' },
-        el('div', { class: 'title' }, s.name),
-        el('div', { class: 'muted', style: 'font-size:12.5px' }, `${s.ticket_count} Codes`)),
-      count, subSelect, genBtn,
-      el('button', {
-        class: 'btn danger sm',
-        onclick: async () => {
-          if (!confirm(`Abteilung „${s.name}" mit allen Codes löschen?`)) return;
-          try { await api.del(`/api/sections/${s.id}`); reload(); } catch (err) { flash(err); }
-        },
-      }, '✕'),
-      el('div', { style: 'flex-basis:100%;margin-top:8px' }, subForm));
+
+    const subTotal = s.subsections.reduce((n, x) => n + x.ticket_count, 0);
+    const directCount = s.ticket_count - subTotal;
+
+    const subCards = s.subsections.map(sub =>
+      el('div', { class: 'subcard' },
+        el('span', { class: 'color-dot', style: `background:${s.color};opacity:0.6` }),
+        el('div', { class: 'grow' },
+          el('div', { class: 'title', style: 'font-size:14px' }, sub.name),
+          el('div', { class: 'muted', style: 'font-size:12px' }, `${sub.ticket_count} Codes`)),
+        uuidGen(`/api/sections/${s.id}/tickets`, { subsection_id: sub.id }, `${s.name} – ${sub.name}`),
+        el('button', {
+          class: 'btn danger sm', title: 'Unterabteilung löschen',
+          onclick: async () => {
+            if (!confirm(`Unterabteilung „${sub.name}" löschen?`)) return;
+            try { await api.del(`/api/subsections/${sub.id}`); reload(); } catch (err) { flash(err); }
+          },
+        }, '✕')));
+
+    const subName = el('input', { type: 'text', placeholder: 'Neue Unterabteilung', style: 'max-width:220px' });
+    const subForm = el('form', { class: 'inline-form', style: 'flex-wrap:wrap;margin-top:8px' },
+      subName, el('button', { class: 'btn secondary sm', type: 'submit' }, '+ Unterabteilung'));
+    subForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      try { await api.post(`/api/sections/${s.id}/subsections`, { name: subName.value }); reload(); }
+      catch (err) { flash(err); }
+    });
+
+    return el('div', { class: 'card section-card' },
+      el('div', { class: 'section-card-head' },
+        colorInput,
+        el('div', { class: 'grow' },
+          el('div', { class: 'title' }, s.name),
+          el('div', { class: 'muted', style: 'font-size:12.5px' }, `${s.ticket_count} Codes gesamt`)),
+        el('button', {
+          class: 'btn danger sm',
+          onclick: async () => {
+            if (!confirm(`Abteilung „${s.name}" mit allen Codes löschen?`)) return;
+            try { await api.del(`/api/sections/${s.id}`); reload(); } catch (err) { flash(err); }
+          },
+        }, 'Löschen')),
+      el('div', { class: 'subcard direct' },
+        el('div', { class: 'grow' },
+          el('div', { class: 'title', style: 'font-size:14px' }, 'Ohne Unterabteilung'),
+          el('div', { class: 'muted', style: 'font-size:12px' }, `${directCount} Codes`)),
+        uuidGen(`/api/sections/${s.id}/tickets`, {}, s.name)),
+      subCards.length ? el('div', { class: 'subcards' }, subCards) : null,
+      subForm);
   });
 
   return el('div', {},
@@ -273,13 +277,12 @@ async function eventBlock(reload) {
         }, '🎟 Einlasskarte gestalten & exportieren'),
         el('span', { class: 'muted', style: 'font-size:12.5px' },
           'Einmal definieren, alle Karten als PNG exportieren.'))),
-    el('div', { class: 'card' },
-      el('div', { class: 'label', style: 'margin-bottom:8px' }, 'Abteilungen'),
-      secForm,
-      sectionRows.length > 0
-        ? el('div', { class: 'list', style: 'margin-top:12px' }, sectionRows)
-        : el('div', { class: 'empty' }, 'Noch keine Abteilungen.'),
-      el('div', { style: 'margin-top:12px' },
-        el('a', { class: 'btn secondary sm', href: tokenized(`/api/events/${event.id}/tickets.xlsx`) },
-          '⬇ Alle UUIDs als Excel'))));
+    el('div', { class: 'section-head' }, el('h2', {}, 'Abteilungen')),
+    secForm,
+    sectionCards.length > 0
+      ? el('div', { class: 'section-cards' }, sectionCards)
+      : el('div', { class: 'empty' }, 'Noch keine Abteilungen.'),
+    el('div', { style: 'margin-top:14px' },
+      el('a', { class: 'btn secondary sm', href: tokenized(`/api/events/${event.id}/tickets.xlsx`) },
+        '⬇ Alle UUIDs als Excel')));
 }

@@ -163,6 +163,18 @@ button.row:hover { background: var(--bg-card); }
 .color-dot {
   width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
 }
+
+/* section cards with nested subsection cards */
+.grow { flex: 1; min-width: 0; }
+.section-cards { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.section-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.subcards { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.subcard {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px;
+}
+.subcard.direct { background: transparent; border-style: dashed; }
 input.color-input {
   width: 34px; height: 34px; padding: 2px; border-radius: 8px;
   border: 1px solid var(--border); background: var(--bg-panel); cursor: pointer;
