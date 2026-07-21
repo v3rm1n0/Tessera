@@ -11,6 +11,7 @@ import { renderAdmin } from './views/admin.js';
 import { renderCardEditor } from './views/card.js';
 import { initTheme } from './theme.js';
 import { t, initI18n } from './i18n.js';
+import { renderSettingsControls } from './settings.js';
 
 export const state = {
   user: null,        // { id, username, role, events: [...] }
@@ -157,7 +158,9 @@ function accountSwitcher() {
         onclick: () => { state.addingAccount = true; route(); },
       }, el('span', { class: 'avatar' }, '＋'), t('account.add')),
       el('button', { class: 'account-item', onclick: doLogout },
-        el('span', { class: 'avatar' }, '⏻'), t('account.logout', { name: state.user.username })));
+        el('span', { class: 'avatar' }, '⏻'), t('account.logout', { name: state.user.username })),
+      el('div', { class: 'account-sep' }),
+      el('div', { style: 'padding:6px 8px' }, renderSettingsControls()));
   }
 
   const trigger = el('button', { class: 'sidebar-footer account-trigger' },

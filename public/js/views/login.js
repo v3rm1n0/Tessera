@@ -1,5 +1,6 @@
 import { api } from '../api.js';
 import { el } from '../app.js';
+import { renderSettingsControls } from '../settings.js';
 
 export function renderLogin(root, onSuccess, onCancel = null) {
   const error = el('div', { class: 'error-text', style: 'display:none' });
@@ -39,6 +40,7 @@ export function renderLogin(root, onSuccess, onCancel = null) {
     el('div', { class: 'login-wrap' },
       el('div', { class: 'login-card' },
         el('h1', {}, '⬢ Voreinlass'),
-        form)));
+        form,
+        el('div', { style: 'margin-top:18px' }, renderSettingsControls()))));
   username.focus();
 }

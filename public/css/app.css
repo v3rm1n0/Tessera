@@ -308,3 +308,13 @@ label.field > span { display: block; margin-bottom: 5px; }
   height: 100%; display: grid; place-items: center;
   color: var(--text-dim); text-align: center; padding: 30px;
 }
+
+/* ---------------------------------------------------------------- settings */
+
+.settings-controls { display: flex; flex-direction: column; gap: 8px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.settings-label { color: var(--text-dim); font-size: 12.5px; }
+.seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; }
+.seg-btn { background: transparent; border: 0; color: var(--text-dim); padding: 4px 9px; border-radius: 6px; font-size: 12.5px; }
+.seg-btn:hover { color: var(--text); }
+.seg-btn.active { background: var(--bg-card); color: var(--accent); }
