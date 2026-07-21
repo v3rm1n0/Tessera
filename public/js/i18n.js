@@ -23,9 +23,22 @@ export const dict = {
     'settings.dark': 'Dunkel',
     'settings.language': 'Sprache',
     'common.cancel': 'Abbrechen',
+    'common.back': '← Zurück',
     'login.username': 'Benutzername',
     'login.password': 'Passwort',
     'login.submit': 'Anmelden',
+    'dash.noEvent': 'Kein Event zugewiesen. Bitte beim Owner melden.',
+    'dash.sections': 'Abteilungen',
+    'dash.scansToday': 'Heute · Total Scans',
+    'dash.noSections': 'Noch keine Abteilungen angelegt.',
+    'dash.codes': '{n} Codes',
+    'dash.doubleTitle': 'Doppelt gescannt',
+    'dash.scansTodayTitle': 'Scans heute',
+    'dash.resetFooter': 'Zähler-Reset täglich um {time} Uhr · Stand: {now}',
+    'section.doublesHead': '{name} – doppelt gescannte Codes',
+    'section.noDoubles': 'Keine doppelten Scans seit dem letzten Reset. 🎉',
+    'section.lastAt': 'zuletzt {time} Uhr',
+    'section.attempts': '{n}×',
   },
   en: {
     brand: 'Voreinlass',
@@ -49,9 +62,22 @@ export const dict = {
     'settings.dark': 'Dark',
     'settings.language': 'Language',
     'common.cancel': 'Cancel',
+    'common.back': '← Back',
     'login.username': 'Username',
     'login.password': 'Password',
     'login.submit': 'Sign in',
+    'dash.noEvent': 'No event assigned. Please contact the owner.',
+    'dash.sections': 'Sections',
+    'dash.scansToday': 'Today · total scans',
+    'dash.noSections': 'No sections created yet.',
+    'dash.codes': '{n} codes',
+    'dash.doubleTitle': 'Scanned twice',
+    'dash.scansTodayTitle': 'Scans today',
+    'dash.resetFooter': 'Counter reset daily at {time} · as of {now}',
+    'section.doublesHead': '{name} – codes scanned twice',
+    'section.noDoubles': 'No duplicate scans since the last reset. 🎉',
+    'section.lastAt': 'last {time}',
+    'section.attempts': '{n}×',
   },
 };
 
@@ -86,6 +112,10 @@ export function getLang() {
 
 export function t(key, params) {
   return translate(getLang(), key, params);
+}
+
+export function dateLocale() {
+  return getLang() === 'en' ? 'en-GB' : 'de-DE';
 }
 
 export function setLang(lang) {
