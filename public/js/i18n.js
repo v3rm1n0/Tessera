@@ -22,6 +22,10 @@ export const dict = {
     'settings.light': 'Hell',
     'settings.dark': 'Dunkel',
     'settings.language': 'Sprache',
+    'common.cancel': 'Abbrechen',
+    'login.username': 'Benutzername',
+    'login.password': 'Passwort',
+    'login.submit': 'Anmelden',
   },
   en: {
     brand: 'Voreinlass',
@@ -44,6 +48,10 @@ export const dict = {
     'settings.light': 'Light',
     'settings.dark': 'Dark',
     'settings.language': 'Language',
+    'common.cancel': 'Cancel',
+    'login.username': 'Username',
+    'login.password': 'Password',
+    'login.submit': 'Sign in',
   },
 };
 
