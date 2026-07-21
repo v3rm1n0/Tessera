@@ -318,3 +318,10 @@ label.field > span { display: block; margin-bottom: 5px; }
 .seg-btn { background: transparent; border: 0; color: var(--text-dim); padding: 4px 9px; border-radius: 6px; font-size: 12.5px; }
 .seg-btn:hover { color: var(--text); }
 .seg-btn.active { background: var(--bg-card); color: var(--accent); }
+.seg-btn.seg-icon { display: inline-flex; align-items: center; justify-content: center; padding: 6px 11px; }
+
+/* inline svg icons inherit currentColor from their button/link */
+.icon { width: 18px; height: 18px; flex-shrink: 0; vertical-align: middle; }
+.nav-icon { width: 20px; height: 20px; }
+.seg-btn .icon { width: 16px; height: 16px; }
+.avatar .icon { width: 15px; height: 15px; }
