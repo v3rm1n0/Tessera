@@ -17,6 +17,11 @@ export const dict = {
     'account.add': 'Konto hinzufügen',
     'account.logout': 'Abmelden ({name})',
     'menu.label': 'Menü',
+    'settings.theme': 'Design',
+    'settings.system': 'System',
+    'settings.light': 'Hell',
+    'settings.dark': 'Dunkel',
+    'settings.language': 'Sprache',
   },
   en: {
     brand: 'Voreinlass',
@@ -34,6 +39,11 @@ export const dict = {
     'account.add': 'Add account',
     'account.logout': 'Log out ({name})',
     'menu.label': 'Menu',
+    'settings.theme': 'Theme',
+    'settings.system': 'System',
+    'settings.light': 'Light',
+    'settings.dark': 'Dark',
+    'settings.language': 'Language',
   },
 };
 
