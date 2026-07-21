@@ -15,6 +15,21 @@ in der Konsole ausgegeben (Passwort via `OWNER_PASSWORD=… npm start` setzbar).
 Die Datenbank liegt in `data/voreinlass.db` (SQLite, via `node:sqlite` — keine
 nativen Module nötig).
 
+### Datenbank-Migrationen
+
+Das Schema wird über versionierte, idempotente Migrationen in
+`server/migrate.js` verwaltet (Tabelle `schema_migrations`). Der Server wendet
+ausstehende Migrationen beim Start automatisch an; für einen expliziten Lauf
+(z. B. im Deploy):
+
+```sh
+npm run migrate                                   # lokal
+DATA_DIR=/var/lib/voreinlass node server/migrate.js   # auf dem Server
+```
+
+Der Lauf ist gefahrlos wiederholbar und funktioniert auch auf einer bereits
+bestehenden Datenbank (bereits vorhandene Strukturen werden übersprungen).
+
 > **Kamera:** Browser erlauben Kamerazugriff nur über HTTPS oder `localhost`.
 > Für Scanner-Handys im LAN also einen Reverse-Proxy mit TLS (z. B. Caddy)
 > davorschalten oder einen Tunnel nutzen.

@@ -12,112 +12,8 @@ export const db = new DatabaseSync(
   process.env.NODE_ENV === 'test' ? ':memory:' : path.join(DATA_DIR, 'voreinlass.db')
 );
 
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA foreign_keys = ON;
-
-  CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT NOT NULL,
-    role          TEXT NOT NULL CHECK (role IN ('OWNER','EVENT_ADMIN','SCANNER')),
-    created_at    INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
-  );
-
-  CREATE TABLE IF NOT EXISTS sessions (
-    token      TEXT PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at INTEGER NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS events (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       TEXT NOT NULL,
-    -- daily scan-count reset time, "HH:MM", configured by the EventAdmin
-    reset_time TEXT NOT NULL DEFAULT '00:00'
-               CHECK (reset_time GLOB '[0-2][0-9]:[0-5][0-9]'),
-    created_at INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
-  );
-
-  -- which EVENT_ADMIN / SCANNER accounts may access which event
-  CREATE TABLE IF NOT EXISTS event_assignments (
-    user_id  INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, event_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS sections (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
-    UNIQUE (event_id, name)
-  );
-
-  -- one row per admission ID (the QR code payload is the uuid)
-  CREATE TABLE IF NOT EXISTS tickets (
-    uuid       TEXT PRIMARY KEY,
-    section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
-  );
-  CREATE INDEX IF NOT EXISTS idx_tickets_section ON tickets(section_id);
-
-  CREATE TABLE IF NOT EXISTS scans (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticket_uuid TEXT NOT NULL REFERENCES tickets(uuid) ON DELETE CASCADE,
-    section_id  INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
-    scanned_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    result      TEXT NOT NULL CHECK (result IN ('OK','DOUBLE')),
-    -- chronological number of the scan within its section since the last reset
-    -- (only set for OK scans)
-    scan_number INTEGER,
-    scanned_at  INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
-  );
-  CREATE INDEX IF NOT EXISTS idx_scans_section_time ON scans(section_id, scanned_at);
-  CREATE INDEX IF NOT EXISTS idx_scans_ticket_time  ON scans(ticket_uuid, scanned_at);
-`);
-
-// -------------------------------------------------------------- migrations
-
-function tableColumns(table) {
-  return db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
-}
-
-function addColumnIfMissing(table, column, definition) {
-  if (!tableColumns(table).includes(column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-  }
-}
-
-function dropColumnIfExists(table, column) {
-  if (tableColumns(table).includes(column)) {
-    try { db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`); }
-    catch { /* SQLite without DROP COLUMN: leave the unused column in place */ }
-  }
-}
-
-addColumnIfMissing('sections', 'color', "TEXT NOT NULL DEFAULT ''");
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS subsections (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,
-    UNIQUE (section_id, name)
-  );
-`);
-addColumnIfMissing('tickets', 'subsection_id',
-  'INTEGER REFERENCES subsections(id) ON DELETE SET NULL');
-
-// admission card (Einlasskarte) configuration — defined once per event
-addColumnIfMissing('events', 'card_title', "TEXT NOT NULL DEFAULT ''");
-addColumnIfMissing('events', 'card_text', "TEXT NOT NULL DEFAULT ''");
-addColumnIfMissing('events', 'card_backdrop', 'BLOB');
-addColumnIfMissing('events', 'card_backdrop_mime', 'TEXT');
-// superseded per-section card columns (from an earlier version)
-for (const col of ['card_title', 'card_text', 'card_backdrop', 'card_backdrop_mime']) {
-  dropColumnIfExists('sections', col);
-}
+// connection settings (the schema itself is created by server/migrate.js)
+db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 
 // ------------------------------------------------------------------ colors
 
@@ -135,12 +31,6 @@ export function pickSectionColor(eventId) {
   const free = SECTION_COLORS.filter(c => !used.includes(c));
   const pool = free.length > 0 ? free : SECTION_COLORS;
   return pool[Math.floor(Math.random() * pool.length)];
-}
-
-// backfill sections created before the color column existed
-for (const s of db.prepare("SELECT id, event_id FROM sections WHERE color = ''").all()) {
-  db.prepare('UPDATE sections SET color = ? WHERE id = ?')
-    .run(pickSectionColor(s.event_id), s.id);
 }
 
 // ---------------------------------------------------------------- passwords

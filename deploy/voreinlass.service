@@ -28,6 +28,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/voreinlass
+# apply pending schema migrations before starting (idempotent; the app would
+# also self-migrate, but this fails fast and logs migrations separately)
+ExecStartPre=/usr/bin/node server/migrate.js
 ExecStart=/usr/bin/node server/index.js
 Environment=NODE_ENV=production
 Environment=PORT=3000

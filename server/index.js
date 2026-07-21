@@ -1,7 +1,8 @@
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { seedOwner } from './db.js';
+import { db, seedOwner } from './db.js';
+import { runMigrations } from './migrate.js';
 import { sessionMiddleware } from './auth.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
@@ -10,6 +11,9 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { scanRouter } from './routes/scan.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// bring the schema up to date before the app (or any test) touches the db
+runMigrations(db);
 
 export function createApp() {
   const app = express();
