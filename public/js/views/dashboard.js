@@ -34,13 +34,17 @@ export async function renderDashboard(content) {
         : el('div', { class: 'list' },
             data.sections.map(s =>
               el('button', { class: 'row', onclick: () => { location.hash = `#/sections/${s.id}`; } },
+                el('span', { class: 'color-dot', style: `background:${s.color}` }),
                 el('div', { class: 'grow' },
                   el('div', { class: 'title' }, s.name),
                   el('div', { class: 'sub' }, `${s.ticket_count} Codes`)),
                 s.doubles_today > 0
                   ? el('span', { class: 'badge warn', title: 'Doppelt gescannt' }, String(s.doubles_today))
                   : null,
-                el('span', { class: 'badge', title: 'Scans heute' }, String(s.scans_today))))),
+                el('span', {
+                  class: 'badge', title: 'Scans heute',
+                  style: `background:${s.color}22;color:${s.color};border-color:${s.color}`,
+                }, String(s.scans_today))))),
       el('p', { class: 'muted', style: 'font-size:12.5px;margin-top:14px' },
         `Zähler-Reset täglich um ${data.event.reset_time} Uhr · Stand: ${new Date().toLocaleTimeString('de-DE')}`));
   }

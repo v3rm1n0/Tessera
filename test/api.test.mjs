@@ -188,6 +188,21 @@ test('resetBoundary math', () => {
   assert.equal(b2.getHours(), 18);
 });
 
+test('sections get a color, randomly assigned or customized', async () => {
+  const dash = await scanner('GET', `/api/events/${eventId}/dashboard`);
+  assert.match(dash.data.sections[0].color, /^#[0-9a-f]{6}$/i);
+
+  const custom = await admin('POST', `/api/events/${eventId}/sections`,
+    { name: 'Parkdienst', color: '#123abc' });
+  assert.equal(custom.status, 201);
+  assert.equal(custom.data.color, '#123abc');
+
+  const patched = await admin('PATCH', `/api/sections/${custom.data.id}`, { color: '#ff8800' });
+  assert.equal(patched.data.color, '#ff8800');
+  assert.equal((await admin('PATCH', `/api/sections/${custom.data.id}`, { color: 'rot' })).status, 400);
+  await admin('DELETE', `/api/sections/${custom.data.id}`);
+});
+
 test('sections, UUIDs and QR codes are EVENT_ADMIN-only', async () => {
   assert.equal((await owner('POST', `/api/events/${eventId}/sections`, { name: 'X' })).status, 403);
   assert.equal((await owner('POST', `/api/sections/${sectionId}/tickets`, { count: 1 })).status, 403);

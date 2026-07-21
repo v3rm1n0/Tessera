@@ -188,7 +188,16 @@ async function eventBlock(reload) {
         reload();
       } catch (err) { flash(err); genBtn.disabled = false; }
     });
+    const colorInput = el('input', {
+      type: 'color', class: 'color-input', value: s.color,
+      title: 'Farbe der Abteilung',
+    });
+    colorInput.addEventListener('change', async () => {
+      try { await api.patch(`/api/sections/${s.id}`, { color: colorInput.value }); reload(); }
+      catch (err) { flash(err); }
+    });
     return el('div', { class: 'row', style: 'flex-wrap:wrap' },
+      colorInput,
       el('div', { class: 'grow' },
         el('div', { class: 'title' }, s.name),
         el('div', { class: 'muted', style: 'font-size:12.5px' }, `${s.ticket_count} Codes`)),

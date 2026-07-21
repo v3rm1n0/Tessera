@@ -77,6 +77,41 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_scans_ticket_time  ON scans(ticket_uuid, scanned_at);
 `);
 
+// -------------------------------------------------------------- migrations
+
+function addColumnIfMissing(table, column, definition) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+  if (!cols.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+addColumnIfMissing('sections', 'color', "TEXT NOT NULL DEFAULT ''");
+
+// ------------------------------------------------------------------ colors
+
+/** Distinct, dashboard-friendly palette for randomly assigned section colors. */
+export const SECTION_COLORS = [
+  '#2dd4a7', '#4f9cf5', '#f5a94b', '#e46fc3', '#8f7ff7',
+  '#f0556a', '#3fc1c9', '#a3d94e', '#f5d90a', '#fa8c5c',
+  '#6ee7f0', '#c98850',
+];
+
+/** Picks a random color, avoiding ones already used within the event. */
+export function pickSectionColor(eventId) {
+  const used = db.prepare('SELECT color FROM sections WHERE event_id = ?')
+    .all(eventId).map(r => r.color);
+  const free = SECTION_COLORS.filter(c => !used.includes(c));
+  const pool = free.length > 0 ? free : SECTION_COLORS;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// backfill sections created before the color column existed
+for (const s of db.prepare("SELECT id, event_id FROM sections WHERE color = ''").all()) {
+  db.prepare('UPDATE sections SET color = ? WHERE id = ?')
+    .run(pickSectionColor(s.event_id), s.id);
+}
+
 // ---------------------------------------------------------------- passwords
 
 export function hashPassword(password) {

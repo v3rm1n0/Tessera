@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import QRCode from 'qrcode';
 import ExcelJS from 'exceljs';
 import archiver from 'archiver';
-import { db } from '../db.js';
+import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess } from '../auth.js';
 
 /**
@@ -26,19 +26,37 @@ eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) =>
 
 // --------------------------------------------------------------- sections
 
+const COLOR_RE = /^#[0-9a-f]{6}$/i;
+
 eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req, res) => {
   const name = (req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Name erforderlich' });
+  const custom = req.body?.color;
+  if (custom !== undefined && !COLOR_RE.test(custom)) {
+    return res.status(400).json({ error: 'color muss das Format #rrggbb haben' });
+  }
+  const color = custom || pickSectionColor(req.event.id);
   try {
-    const info = db.prepare('INSERT INTO sections (event_id, name) VALUES (?, ?)')
-      .run(req.event.id, name);
-    res.status(201).json({ id: Number(info.lastInsertRowid), event_id: req.event.id, name });
+    const info = db.prepare('INSERT INTO sections (event_id, name, color) VALUES (?, ?, ?)')
+      .run(req.event.id, name, color);
+    res.status(201).json({ id: Number(info.lastInsertRowid), event_id: req.event.id, name, color });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
       return res.status(409).json({ error: 'Abteilung existiert bereits' });
     }
     throw e;
   }
+});
+
+eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, (req, res) => {
+  const color = req.body?.color;
+  if (color !== undefined) {
+    if (!COLOR_RE.test(color)) {
+      return res.status(400).json({ error: 'color muss das Format #rrggbb haben' });
+    }
+    db.prepare('UPDATE sections SET color = ? WHERE id = ?').run(color, req.section.id);
+  }
+  res.json(db.prepare('SELECT * FROM sections WHERE id = ?').get(req.section.id));
 });
 
 eventsRouter.delete('/sections/:sectionId', manage, requireSectionAccess, (req, res) => {

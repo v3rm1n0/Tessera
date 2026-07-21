@@ -9,7 +9,7 @@ dashboardRouter.use(requireAuth);
 dashboardRouter.get('/events/:eventId/dashboard', requireEventAccess, (req, res) => {
   const since = resetBoundary(req.event.reset_time);
   const sections = db.prepare(`
-    SELECT s.id, s.name,
+    SELECT s.id, s.name, s.color,
            (SELECT COUNT(*) FROM tickets t WHERE t.section_id = s.id) AS ticket_count,
            (SELECT COUNT(*) FROM scans sc
              WHERE sc.section_id = s.id AND sc.result = 'OK' AND sc.scanned_at >= ?) AS scans_today,
