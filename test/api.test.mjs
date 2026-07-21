@@ -203,6 +203,33 @@ test('sections get a color, randomly assigned or customized', async () => {
   await admin('DELETE', `/api/sections/${custom.data.id}`);
 });
 
+test('subsections: tickets carry them, scan label shows "Section – Subsection"', async () => {
+  const sub = await admin('POST', `/api/sections/${sectionId}/subsections`, { name: 'Innenraum Ordner' });
+  assert.equal(sub.status, 201);
+  assert.equal((await admin('POST', `/api/sections/${sectionId}/subsections`,
+    { name: 'Innenraum Ordner' })).status, 409);
+
+  // subsection of a foreign section is rejected
+  assert.equal((await admin('POST', `/api/sections/${sectionId}/tickets`,
+    { count: 1, subsection_id: 99999 })).status, 400);
+
+  const gen = await admin('POST', `/api/sections/${sectionId}/tickets`,
+    { count: 1, subsection_id: sub.data.id });
+  assert.equal(gen.status, 201);
+
+  const scan = await scanner('POST', '/api/scan', { code: gen.data.uuids[0] });
+  assert.equal(scan.data.status, 'OK');
+  assert.equal(scan.data.section, 'Audio Video – Innenraum Ordner');
+
+  const tickets = (await admin('GET', `/api/sections/${sectionId}/tickets`)).data;
+  assert.equal(tickets.find(t => t.uuid === gen.data.uuids[0]).subsection, 'Innenraum Ordner');
+
+  const dash = await scanner('GET', `/api/events/${eventId}/dashboard`);
+  assert.deepEqual(dash.data.sections[0].subsections.map(x => x.name), ['Innenraum Ordner']);
+
+  assert.equal((await admin('DELETE', `/api/subsections/${sub.data.id}`)).status, 200);
+});
+
 test('sections, UUIDs and QR codes are EVENT_ADMIN-only', async () => {
   assert.equal((await owner('POST', `/api/events/${eventId}/sections`, { name: 'X' })).status, 403);
   assert.equal((await owner('POST', `/api/sections/${sectionId}/tickets`, { count: 1 })).status, 403);

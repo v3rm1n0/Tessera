@@ -179,14 +179,46 @@ async function eventBlock(reload) {
     const count = el('input', {
       type: 'number', min: '1', max: '10000', value: '50', style: 'width:90px',
     });
+    const subSelect = el('select', { style: 'width:auto' },
+      el('option', { value: '' }, 'Ohne Unterabteilung'),
+      s.subsections.map(sub => el('option', { value: sub.id }, sub.name)));
     const genBtn = el('button', { class: 'btn sm' }, 'UUIDs erzeugen');
     genBtn.addEventListener('click', async () => {
       genBtn.disabled = true;
       try {
-        const r = await api.post(`/api/sections/${s.id}/tickets`, { count: Number(count.value) });
-        alert(`${r.created} UUIDs für „${s.name}" erzeugt.`);
+        const r = await api.post(`/api/sections/${s.id}/tickets`, {
+          count: Number(count.value),
+          ...(subSelect.value ? { subsection_id: Number(subSelect.value) } : {}),
+        });
+        const subName = subSelect.selectedOptions[0]?.textContent;
+        alert(`${r.created} UUIDs für „${subSelect.value ? `${s.name} – ${subName}` : s.name}" erzeugt.`);
         reload();
       } catch (err) { flash(err); genBtn.disabled = false; }
+    });
+
+    // subsection chips + add form
+    const subName = el('input', { type: 'text', placeholder: 'Neue Unterabteilung', style: 'max-width:220px' });
+    const subForm = el('form', { class: 'inline-form', style: 'flex-wrap:wrap' },
+      ...s.subsections.map(sub => {
+        const chip = el('button', {
+          type: 'button', class: 'btn secondary sm',
+          title: 'Unterabteilung löschen',
+        }, `${sub.name} ✕`);
+        chip.addEventListener('click', async () => {
+          if (!confirm(`Unterabteilung „${sub.name}" löschen?`)) return;
+          try { await api.del(`/api/subsections/${sub.id}`); reload(); }
+          catch (err) { flash(err); }
+        });
+        return chip;
+      }),
+      subName,
+      el('button', { class: 'btn secondary sm', type: 'submit' }, '+ Hinzufügen'));
+    subForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        await api.post(`/api/sections/${s.id}/subsections`, { name: subName.value });
+        reload();
+      } catch (err) { flash(err); }
     });
     const colorInput = el('input', {
       type: 'color', class: 'color-input', value: s.color,
@@ -201,7 +233,7 @@ async function eventBlock(reload) {
       el('div', { class: 'grow' },
         el('div', { class: 'title' }, s.name),
         el('div', { class: 'muted', style: 'font-size:12.5px' }, `${s.ticket_count} Codes`)),
-      count, genBtn,
+      count, subSelect, genBtn,
       el('a', { class: 'btn secondary sm', href: tokenized(`/api/sections/${s.id}/qrcodes.zip`) }, 'QR · ZIP'),
       el('a', { class: 'btn secondary sm', href: tokenized(`/api/sections/${s.id}/qrcodes/print`), target: '_blank' }, 'QR · Drucken'),
       el('button', {
@@ -210,7 +242,8 @@ async function eventBlock(reload) {
           if (!confirm(`Abteilung „${s.name}" mit allen Codes löschen?`)) return;
           try { await api.del(`/api/sections/${s.id}`); reload(); } catch (err) { flash(err); }
         },
-      }, '✕'));
+      }, '✕'),
+      el('div', { style: 'flex-basis:100%;margin-top:8px' }, subForm));
   });
 
   return el('div', {},

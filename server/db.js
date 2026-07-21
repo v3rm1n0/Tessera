@@ -88,6 +88,17 @@ function addColumnIfMissing(table, column, definition) {
 
 addColumnIfMissing('sections', 'color', "TEXT NOT NULL DEFAULT ''");
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS subsections (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    UNIQUE (section_id, name)
+  );
+`);
+addColumnIfMissing('tickets', 'subsection_id',
+  'INTEGER REFERENCES subsections(id) ON DELETE SET NULL');
+
 // ------------------------------------------------------------------ colors
 
 /** Distinct, dashboard-friendly palette for randomly assigned section colors. */

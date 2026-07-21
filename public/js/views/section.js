@@ -23,6 +23,7 @@ export async function renderSectionDetail(content, sectionId) {
               el('div', { class: 'grow' },
                 el('div', { class: 'sub', style: 'font-size:14px' }, d.uuid),
                 el('div', { class: 'muted', style: 'font-size:12.5px' },
+                  d.subsection ? `${d.subsection} · ` : '',
                   `zuletzt ${new Date(d.last_attempt_at).toLocaleTimeString('de-DE')} Uhr`)),
               el('span', { class: 'badge warn' }, `${d.attempts}×`)))));
 }

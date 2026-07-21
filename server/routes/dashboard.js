@@ -14,9 +14,12 @@ dashboardRouter.get('/events/:eventId/dashboard', requireEventAccess, (req, res)
            (SELECT COUNT(*) FROM scans sc
              WHERE sc.section_id = s.id AND sc.result = 'OK' AND sc.scanned_at >= ?) AS scans_today,
            (SELECT COUNT(DISTINCT sc.ticket_uuid) FROM scans sc
-             WHERE sc.section_id = s.id AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?) AS doubles_today
+             WHERE sc.section_id = s.id AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?) AS doubles_today,
+           (SELECT json_group_array(json_object('id', sub.id, 'name', sub.name))
+             FROM subsections sub WHERE sub.section_id = s.id) AS subsections
     FROM sections s WHERE s.event_id = ? ORDER BY s.name
-  `).all(since, since, req.event.id);
+  `).all(since, since, req.event.id)
+    .map(s => ({ ...s, subsections: JSON.parse(s.subsections) }));
 
   res.json({
     event: { id: req.event.id, name: req.event.name, reset_time: req.event.reset_time },
@@ -32,9 +35,12 @@ dashboardRouter.get('/sections/:sectionId/doubles', requireSectionAccess, (req, 
   const since = resetBoundary(req.event.reset_time);
   const doubles = db.prepare(`
     SELECT sc.ticket_uuid AS uuid,
+           sub.name AS subsection,
            COUNT(*) AS attempts,
            MAX(sc.scanned_at) AS last_attempt_at
     FROM scans sc
+    JOIN tickets t ON t.uuid = sc.ticket_uuid
+    LEFT JOIN subsections sub ON sub.id = t.subsection_id
     WHERE sc.section_id = ? AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?
     GROUP BY sc.ticket_uuid
     ORDER BY last_attempt_at DESC

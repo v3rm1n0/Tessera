@@ -20,8 +20,12 @@ scanRouter.post('/scan', requireAuth, (req, res) => {
   }
 
   const ticket = db.prepare(`
-    SELECT t.uuid, t.section_id, s.name AS section_name, s.event_id
-    FROM tickets t JOIN sections s ON s.id = t.section_id
+    SELECT t.uuid, t.section_id, s.event_id,
+           CASE WHEN sub.name IS NULL THEN s.name
+                ELSE s.name || ' – ' || sub.name END AS section_name
+    FROM tickets t
+    JOIN sections s ON s.id = t.section_id
+    LEFT JOIN subsections sub ON sub.id = t.subsection_id
     WHERE t.uuid = ?
   `).get(code);
   if (!ticket) {
