@@ -7,10 +7,10 @@ export const authRouter = Router();
 authRouter.post('/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+    return res.status(400).json({ error: 'Username and password are required' });
   }
   const user = attemptLogin(username, password);
-  if (!user) return res.status(401).json({ error: 'Ungültige Anmeldedaten' });
+  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
   const token = login(res, user.id);
   res.json({ id: user.id, username: user.username, role: user.role, token });
 });
