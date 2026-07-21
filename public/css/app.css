@@ -14,6 +14,21 @@
   --radius: 10px;
 }
 
+:root[data-theme="light"] {
+  --bg: #f4f6fb;
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  --border: #dfe4ee;
+  --text: #1a2436;
+  --text-dim: #5c6b82;
+  --accent: #12b088;
+  --accent-dim: rgba(18, 176, 136, 0.14);
+  --danger: #d83a52;
+  --danger-dim: rgba(216, 58, 82, 0.12);
+  --warn: #c9781c;
+  --warn-dim: rgba(201, 120, 28, 0.14);
+}
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
