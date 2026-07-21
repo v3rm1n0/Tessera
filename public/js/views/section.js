@@ -26,5 +26,5 @@ export async function renderSectionDetail(content, sectionId) {
                 el('div', { class: 'muted', style: 'font-size:12.5px' },
                   d.subsection ? `${d.subsection} · ` : '',
                   t('section.lastAt', { time: new Date(d.last_attempt_at).toLocaleTimeString(dateLocale()) }))),
-              el('span', { class: 'badge warn' }, t('section.attempts', { n: d.attempts })))));
+              el('span', { class: 'badge warn' }, t('section.attempts', { n: d.attempts }))))));
 }
