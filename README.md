@@ -63,8 +63,9 @@ Hintergrundbild, Titel und Text (mit `**Fettdruck**`) sind frei wählbar. Ein
 einziger Export erzeugt für **jede UUID aller Abteilungen** eine Karte: im
 Browser auf einem `<canvas>` zusammengesetzt (Hauptfarbe der jeweiligen
 Abteilung, QR-Code + „Abteilung – Unterabteilung"), gebündelt als PNG in einer
-ZIP-Datei. Der Server speichert nur die Konfiguration (kein natives Bildmodul,
-keine serverseitige QR-Bibliothek nötig).
+ZIP-Datei — je Abteilung ein Ordner, je Unterabteilung ein Unterordner
+(`Abteilung/Unterabteilung/uuid.png`). Der Server speichert nur die
+Konfiguration (kein natives Bildmodul, keine serverseitige QR-Bibliothek nötig).
 
 **Kontowechsler:** Über den Bereich unten in der Seitenleiste können mehrere
 Konten gleichzeitig angemeldet sein („Konto hinzufügen") und per Klick

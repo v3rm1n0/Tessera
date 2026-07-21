@@ -167,7 +167,11 @@ export async function renderCardEditor(content, eventId) {
           label, backdropImg, matrix: qrMatrix(t.uuid),
         });
         const blob = await new Promise(r => off.toBlob(r, 'image/png'));
-        zip.folder(safe(label)).file(`${t.uuid}.png`, blob);
+        // dedicated folder per section, subfolder per subsection
+        const dir = t.subsection
+          ? zip.folder(safe(t.section)).folder(safe(t.subsection))
+          : zip.folder(safe(t.section));
+        dir.file(`${t.uuid}.png`, blob);
         progress.textContent = `Erzeuge ${i + 1}/${tickets.length} …`;
         if (i % 8 === 0) await new Promise(r => setTimeout(r));
       }
