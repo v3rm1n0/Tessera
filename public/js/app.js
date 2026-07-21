@@ -10,6 +10,7 @@ import { renderScanner } from './views/scanner.js';
 import { renderAdmin } from './views/admin.js';
 import { renderCardEditor } from './views/card.js';
 import { initTheme } from './theme.js';
+import { t, initI18n } from './i18n.js';
 
 export const state = {
   user: null,        // { id, username, role, events: [...] }
@@ -54,11 +55,11 @@ let cleanup = null; // view teardown (e.g. stop the camera)
 const EVENT_ROLES = ['EVENT_ADMIN', 'SCANNER'];
 
 const ROUTES = [
-  { path: /^#\/dashboard$/, title: 'Dashboard', render: renderDashboard, roles: EVENT_ROLES },
-  { path: /^#\/sections\/(\d+)$/, title: 'Abteilung', render: renderSectionDetail, roles: EVENT_ROLES },
-  { path: /^#\/scanner$/, title: 'Scannen', render: renderScanner, bare: true, roles: EVENT_ROLES },
-  { path: /^#\/verwaltung$/, title: 'Verwaltung', render: renderAdmin, roles: ['OWNER', 'EVENT_ADMIN'] },
-  { path: /^#\/karte\/(\d+)$/, title: 'Einlasskarte', render: renderCardEditor, roles: ['EVENT_ADMIN'] },
+  { path: /^#\/dashboard$/, titleKey: 'title.dashboard', render: renderDashboard, roles: EVENT_ROLES },
+  { path: /^#\/sections\/(\d+)$/, titleKey: 'title.section', render: renderSectionDetail, roles: EVENT_ROLES },
+  { path: /^#\/scanner$/, titleKey: 'title.scan', render: renderScanner, bare: true, roles: EVENT_ROLES },
+  { path: /^#\/verwaltung$/, titleKey: 'title.admin', render: renderAdmin, roles: ['OWNER', 'EVENT_ADMIN'] },
+  { path: /^#\/karte\/(\d+)$/, titleKey: 'title.card', render: renderCardEditor, roles: ['EVENT_ADMIN'] },
 ];
 
 /** The owner administrates only; day-to-day views belong to the event roles. */
@@ -70,11 +71,11 @@ function navItems() {
   const items = [];
   if (EVENT_ROLES.includes(state.user.role)) {
     items.push(
-      { hash: '#/dashboard', label: 'Dashboard', icon: '▦' },
-      { hash: '#/scanner', label: 'Scannen', icon: '⛶' });
+      { hash: '#/dashboard', label: t('nav.dashboard'), icon: '▦' },
+      { hash: '#/scanner', label: t('nav.scan'), icon: '⛶' });
   }
   if (['OWNER', 'EVENT_ADMIN'].includes(state.user.role)) {
-    items.push({ hash: '#/verwaltung', label: 'Verwaltung', icon: '⚙' });
+    items.push({ hash: '#/verwaltung', label: t('nav.admin'), icon: '⚙' });
   }
   return items;
 }
@@ -90,7 +91,7 @@ function renderShell(title, bare) {
         }, el('span', {}, item.icon), item.label))),
     accountSwitcher());
 
-  const burger = el('button', { class: 'burger', 'aria-label': 'Menü' }, '☰');
+  const burger = el('button', { class: 'burger', 'aria-label': t('menu.label') }, '☰');
   let backdrop = null;
   burger.addEventListener('click', () => {
     sidebar.classList.add('open');
@@ -123,7 +124,7 @@ function renderShell(title, bare) {
 }
 
 function roleLabel(role) {
-  return { OWNER: 'Owner', EVENT_ADMIN: 'Event-Admin', SCANNER: 'Scanner' }[role] || role;
+  return t('role.' + role);
 }
 
 // -------------------------------------------------------- account switcher
@@ -154,9 +155,9 @@ function accountSwitcher() {
       el('button', {
         class: 'account-item',
         onclick: () => { state.addingAccount = true; route(); },
-      }, el('span', { class: 'avatar' }, '＋'), 'Konto hinzufügen'),
+      }, el('span', { class: 'avatar' }, '＋'), t('account.add')),
       el('button', { class: 'account-item', onclick: doLogout },
-        el('span', { class: 'avatar' }, '⏻'), `Abmelden (${state.user.username})`));
+        el('span', { class: 'avatar' }, '⏻'), t('account.logout', { name: state.user.username })));
   }
 
   const trigger = el('button', { class: 'sidebar-footer account-trigger' },
@@ -216,7 +217,7 @@ async function route() {
     location.hash = defaultRoute();
     return;
   }
-  const content = renderShell(r.title, r.bare);
+  const content = renderShell(t(r.titleKey), r.bare);
   cleanup = await r.render(content, ...m.slice(1).map(Number)) || null;
 }
 
@@ -231,5 +232,7 @@ function showLogin(cancelable) {
 }
 
 window.addEventListener('hashchange', route);
+window.addEventListener('voreinlass:relang', route);
 initTheme();
+initI18n();
 route();
