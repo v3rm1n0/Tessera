@@ -1,11 +1,12 @@
 import { api } from '../api.js';
 import { el, state, currentEvent } from '../app.js';
+import { t, dateLocale } from '../i18n.js';
 
 export async function renderDashboard(content) {
   const event = currentEvent();
   if (!event) {
     content.replaceChildren(el('div', { class: 'empty' },
-      'Kein Event zugewiesen. Bitte beim Owner melden.'));
+      t('dash.noEvent')));
     return;
   }
 
@@ -24,29 +25,29 @@ export async function renderDashboard(content) {
     container.replaceChildren(
       el('div', { class: 'cards' },
         el('div', { class: 'card' },
-          el('div', { class: 'label' }, 'Abteilungen'),
+          el('div', { class: 'label' }, t('dash.sections')),
           el('div', { class: 'value' }, String(data.total_sections))),
         el('div', { class: 'card' },
-          el('div', { class: 'label' }, 'Heute · Total Scans'),
+          el('div', { class: 'label' }, t('dash.scansToday')),
           el('div', { class: 'value' }, String(data.total_scans_today)))),
       data.sections.length === 0
-        ? el('div', { class: 'empty' }, 'Noch keine Abteilungen angelegt.')
+        ? el('div', { class: 'empty' }, t('dash.noSections'))
         : el('div', { class: 'list' },
             data.sections.map(s =>
               el('button', { class: 'row', onclick: () => { location.hash = `#/sections/${s.id}`; } },
                 el('span', { class: 'color-dot', style: `background:${s.color}` }),
                 el('div', { class: 'grow' },
                   el('div', { class: 'title' }, s.name),
-                  el('div', { class: 'sub' }, `${s.ticket_count} Codes`)),
+                  el('div', { class: 'sub' }, t('dash.codes', { n: s.ticket_count }))),
                 s.doubles_today > 0
-                  ? el('span', { class: 'badge warn', title: 'Doppelt gescannt' }, String(s.doubles_today))
+                  ? el('span', { class: 'badge warn', title: t('dash.doubleTitle') }, String(s.doubles_today))
                   : null,
                 el('span', {
-                  class: 'badge', title: 'Scans heute',
+                  class: 'badge', title: t('dash.scansTodayTitle'),
                   style: `background:${s.color}22;color:${s.color};border-color:${s.color}`,
                 }, String(s.scans_today))))),
       el('p', { class: 'muted', style: 'font-size:12.5px;margin-top:14px' },
-        `Zähler-Reset täglich um ${data.event.reset_time} Uhr · Stand: ${new Date().toLocaleTimeString('de-DE')}`));
+        t('dash.resetFooter', { time: data.event.reset_time, now: new Date().toLocaleTimeString(dateLocale()) })));
   }
 
   await load();
