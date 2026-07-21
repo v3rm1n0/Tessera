@@ -12,6 +12,7 @@ import { renderCardEditor } from './views/card.js';
 import { initTheme } from './theme.js';
 import { t, initI18n } from './i18n.js';
 import { renderSettingsControls } from './settings.js';
+import { icon } from './icons.js';
 
 export const state = {
   user: null,     // { id, username, role, events: [...] }
@@ -68,11 +69,11 @@ function navItems() {
   const items = [];
   if (EVENT_ROLES.includes(state.user.role)) {
     items.push(
-      { hash: '#/dashboard', label: t('nav.dashboard'), icon: '▦' },
-      { hash: '#/scanner', label: t('nav.scan'), icon: '⛶' });
+      { hash: '#/dashboard', label: t('nav.dashboard'), icon: 'dashboard' },
+      { hash: '#/scanner', label: t('nav.scan'), icon: 'scan' });
   }
   if (['OWNER', 'EVENT_ADMIN'].includes(state.user.role)) {
-    items.push({ hash: '#/verwaltung', label: t('nav.admin'), icon: '⚙' });
+    items.push({ hash: '#/verwaltung', label: t('nav.admin'), icon: 'settings' });
   }
   return items;
 }
@@ -85,7 +86,7 @@ function renderShell(title, bare) {
         el('a', {
           href: item.hash,
           class: location.hash.startsWith(item.hash) ? 'active' : '',
-        }, el('span', {}, item.icon), item.label))),
+        }, icon(item.icon, 'icon nav-icon'), item.label))),
     accountSwitcher());
 
   const burger = el('button', { class: 'burger', 'aria-label': t('menu.label') }, '☰');
@@ -152,7 +153,7 @@ function accountSwitcher() {
         onclick: () => { state.addingAccount = true; route(); },
       }, el('span', { class: 'avatar' }, '＋'), t('account.add')),
       el('button', { class: 'account-item', onclick: doLogout },
-        el('span', { class: 'avatar' }, '⏻'), t('account.logout', { name: state.user.username })),
+        el('span', { class: 'avatar' }, icon('logout', 'icon')), t('account.logout', { name: state.user.username })),
       el('div', { class: 'account-sep' }),
       el('div', { style: 'padding:6px 8px' }, renderSettingsControls()));
   }
