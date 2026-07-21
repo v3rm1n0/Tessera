@@ -16,3 +16,6 @@ result-*
 # logs & OS cruft
 *.log
 .DS_Store
+
+# design/spec docs (local only)
+docs/

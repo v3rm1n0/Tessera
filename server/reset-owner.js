@@ -1,10 +1,6 @@
 /**
  * Resets (or creates) the owner account password.
- *
- * Usage:
- *   node server/reset-owner.js [new-password]
- *   DATA_DIR=/var/lib/voreinlass node server/reset-owner.js   # on the server
- *
+ * Usage: node server/reset-owner.js [new-password]
  * Without an argument a random password is generated and printed.
  */
 import { randomUUID } from 'node:crypto';

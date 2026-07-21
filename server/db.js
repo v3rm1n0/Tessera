@@ -15,8 +15,6 @@ export const db = new DatabaseSync(
 // connection settings (the schema itself is created by server/migrate.js)
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 
-// ------------------------------------------------------------------ colors
-
 /** Distinct, dashboard-friendly palette for randomly assigned section colors. */
 export const SECTION_COLORS = [
   '#2dd4a7', '#4f9cf5', '#f5a94b', '#e46fc3', '#8f7ff7',
@@ -33,8 +31,6 @@ export function pickSectionColor(eventId) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// ---------------------------------------------------------------- passwords
-
 export function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
   const hash = scryptSync(password, salt, 64).toString('hex');
@@ -47,13 +43,7 @@ export function verifyPassword(password, stored) {
   return scryptSync(password, salt, 64).toString('hex') === hash;
 }
 
-// ---------------------------------------------------------------- reset time
-
-/**
- * Timestamp (ms) of the most recent daily reset for an event.
- * "Today's" scans are all scans with scanned_at >= this boundary, which
- * makes counts reset precisely at the configured time without any cron job.
- */
+/** Timestamp (ms) of the most recent daily reset; "today" = scans with scanned_at >= this, so counts reset at the configured time without a cron job. */
 export function resetBoundary(resetTime, now = new Date()) {
   const [h, m] = resetTime.split(':').map(Number);
   const boundary = new Date(now);
@@ -69,8 +59,6 @@ export function eventBoundary(eventId) {
   if (!ev) return null;
   return resetBoundary(ev.reset_time);
 }
-
-// ---------------------------------------------------------------- seeding
 
 export function seedOwner() {
   const existing = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'OWNER'").get();

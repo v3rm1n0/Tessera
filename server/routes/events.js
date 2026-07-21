@@ -4,34 +4,27 @@ import ExcelJS from 'exceljs';
 import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
 
-/**
- * EventAdmin functionality. Deliberately EVENT_ADMIN-only: sections, UUIDs
- * and QR codes are managed exclusively by the event admins of an event.
- */
+/** Event Admin functionality: sections, UUIDs and QR codes are managed exclusively by the event's admins. */
 export const eventsRouter = Router();
 const manage = requireRole('EVENT_ADMIN');
-
-// ------------------------------------------------------------- reset time
 
 eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) => {
   const resetTime = req.body?.reset_time;
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(resetTime || '')) {
-    return res.status(400).json({ error: 'reset_time muss das Format HH:MM haben' });
+    return res.status(400).json({ error: 'reset_time must be in HH:MM format' });
   }
   db.prepare('UPDATE events SET reset_time = ? WHERE id = ?').run(resetTime, req.event.id);
   res.json({ ...req.event, reset_time: resetTime });
 });
 
-// --------------------------------------------------------------- sections
-
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req, res) => {
   const name = (req.body?.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'Name erforderlich' });
+  if (!name) return res.status(400).json({ error: 'Name is required' });
   const custom = req.body?.color;
   if (custom !== undefined && !COLOR_RE.test(custom)) {
-    return res.status(400).json({ error: 'color muss das Format #rrggbb haben' });
+    return res.status(400).json({ error: 'color must be in #rrggbb format' });
   }
   const color = custom || pickSectionColor(req.event.id);
   try {
@@ -40,7 +33,7 @@ eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req,
     res.status(201).json({ id: Number(info.lastInsertRowid), event_id: req.event.id, name, color });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Abteilung existiert bereits' });
+      return res.status(409).json({ error: 'Section already exists' });
     }
     throw e;
   }
@@ -50,7 +43,7 @@ eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, (req, r
   const color = req.body?.color;
   if (color !== undefined) {
     if (!COLOR_RE.test(color)) {
-      return res.status(400).json({ error: 'color muss das Format #rrggbb haben' });
+      return res.status(400).json({ error: 'color must be in #rrggbb format' });
     }
     db.prepare('UPDATE sections SET color = ? WHERE id = ?').run(color, req.section.id);
   }
@@ -62,18 +55,16 @@ eventsRouter.delete('/sections/:sectionId', manage, requireSectionAccess, (req, 
   res.json({ ok: true });
 });
 
-// ------------------------------------------------------------- subsections
-
 eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAccess, (req, res) => {
   const name = (req.body?.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'Name erforderlich' });
+  if (!name) return res.status(400).json({ error: 'Name is required' });
   try {
     const info = db.prepare('INSERT INTO subsections (section_id, name) VALUES (?, ?)')
       .run(req.section.id, name);
     res.status(201).json({ id: Number(info.lastInsertRowid), section_id: req.section.id, name });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Unterabteilung existiert bereits' });
+      return res.status(409).json({ error: 'Subsection already exists' });
     }
     throw e;
   }
@@ -89,26 +80,24 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
     SELECT sub.id, s.event_id FROM subsections sub
     JOIN sections s ON s.id = sub.section_id WHERE sub.id = ?
   `).get(Number(req.params.id));
-  if (!sub) return res.status(404).json({ error: 'Unterabteilung nicht gefunden' });
+  if (!sub) return res.status(404).json({ error: 'Subsection not found' });
   if (!canAccessEvent(req.user, sub.event_id)) {
-    return res.status(403).json({ error: 'Keine Berechtigung für dieses Event' });
+    return res.status(403).json({ error: 'Not authorized for this event' });
   }
   db.prepare('DELETE FROM subsections WHERE id = ?').run(sub.id);
   res.json({ ok: true });
 });
 
-// ---------------------------------------------------------------- tickets
-
 eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, (req, res) => {
   const count = Number(req.body?.count);
   if (!Number.isInteger(count) || count < 1 || count > 10000) {
-    return res.status(400).json({ error: 'count muss zwischen 1 und 10000 liegen' });
+    return res.status(400).json({ error: 'count must be between 1 and 10000' });
   }
   let subsectionId = null;
   if (req.body?.subsection_id != null) {
     const sub = db.prepare('SELECT id FROM subsections WHERE id = ? AND section_id = ?')
       .get(Number(req.body.subsection_id), req.section.id);
-    if (!sub) return res.status(400).json({ error: 'Unterabteilung gehört nicht zu dieser Abteilung' });
+    if (!sub) return res.status(400).json({ error: 'Subsection does not belong to this section' });
     subsectionId = sub.id;
   }
   const insert = db.prepare(
@@ -141,14 +130,8 @@ eventsRouter.get('/sections/:sectionId/tickets', manage, requireSectionAccess, (
   res.json(sectionTickets(req.section.id));
 });
 
-// ----------------------------------------------------- admission cards
-//
-// The admission card is defined ONCE per event (title, body text, backdrop
-// image); the section color is the per-card main color and the QR + label
-// ("Section – Subsection") are filled in per ticket. Cards are composited
-// client-side on a <canvas> and exported as PNG in bulk — the server stores
-// only the config and needs no native image library.
-
+// admission card: defined once per event (title, text, backdrop); cards are
+// composited client-side on a <canvas>, so the server only stores the config
 const CARD_MIMES = ['image/png', 'image/jpeg', 'image/webp'];
 
 eventsRouter.get('/events/:eventId/card', manage, requireEventAccess, (req, res) => {
@@ -191,10 +174,10 @@ eventsRouter.post('/events/:eventId/card/backdrop',
   (req, res) => {
     const mime = req.headers['content-type'];
     if (!CARD_MIMES.includes(mime)) {
-      return res.status(400).json({ error: 'Nur PNG, JPEG oder WebP erlaubt' });
+      return res.status(400).json({ error: 'Only PNG, JPEG or WebP allowed' });
     }
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      return res.status(400).json({ error: 'Bilddaten fehlen' });
+      return res.status(400).json({ error: 'Image data missing' });
     }
     db.prepare('UPDATE events SET card_backdrop = ?, card_backdrop_mime = ? WHERE id = ?')
       .run(req.body, mime, req.event.id);
@@ -204,7 +187,7 @@ eventsRouter.post('/events/:eventId/card/backdrop',
 eventsRouter.get('/events/:eventId/card/backdrop', manage, requireEventAccess, (req, res) => {
   const e = db.prepare('SELECT card_backdrop, card_backdrop_mime FROM events WHERE id = ?')
     .get(req.event.id);
-  if (!e.card_backdrop) return res.status(404).json({ error: 'Kein Hintergrundbild' });
+  if (!e.card_backdrop) return res.status(404).json({ error: 'No background image' });
   res.setHeader('Content-Type', e.card_backdrop_mime);
   res.setHeader('Cache-Control', 'no-store');
   res.end(Buffer.from(e.card_backdrop));
@@ -228,13 +211,7 @@ eventsRouter.get('/events/:eventId/card/tickets', manage, requireEventAccess, (r
   `).all(req.event.id));
 });
 
-/**
- * One small UUID-list workbook per folder of the card export: grouped by
- * subsection, plus a group per section for its direct (no-subsection)
- * tickets. Columns are just the label, the UUID and an empty recipient
- * column so section/subsection heads can tick off who received which code.
- * Returned as base64 so the client can drop each into the matching folder.
- */
+/** One UUID-list workbook per export folder (grouped by section/subsection), returned as base64 for the client to place. */
 eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async (req, res) => {
   const rows = db.prepare(`
     SELECT t.uuid, s.id AS section_id, s.name AS section,
@@ -261,9 +238,9 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
     const wb = new ExcelJS.Workbook();
     const sheet = wb.addWorksheet('UUIDs');
     sheet.columns = [
-      { header: 'Abteilung', key: 'label', width: 34 },
+      { header: 'Section', key: 'label', width: 34 },
       { header: 'UUID', key: 'uuid', width: 40 },
-      { header: 'Name (Empfänger)', key: 'name', width: 30 },
+      { header: 'Name (recipient)', key: 'name', width: 30 },
     ];
     sheet.getRow(1).font = { bold: true };
     for (const uuid of g.uuids) sheet.addRow({ label, uuid, name: '' });
@@ -273,20 +250,18 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
   res.json({ groups: out });
 });
 
-// ------------------------------------------------------------ Excel export
-
 eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, async (req, res) => {
   const sections = db.prepare('SELECT * FROM sections WHERE event_id = ? ORDER BY name')
     .all(req.event.id);
   const wb = new ExcelJS.Workbook();
   for (const section of sections) {
     // sheet names: max 31 chars, no \ / ? * [ ] :
-    const sheet = wb.addWorksheet(section.name.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Abteilung');
+    const sheet = wb.addWorksheet(section.name.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Section');
     sheet.columns = [
-      { header: 'Abteilung', key: 'section', width: 30 },
-      { header: 'Unterabteilung', key: 'subsection', width: 30 },
+      { header: 'Section', key: 'section', width: 30 },
+      { header: 'Subsection', key: 'subsection', width: 30 },
       { header: 'UUID', key: 'uuid', width: 40 },
-      { header: 'Erstellt', key: 'created', width: 22 },
+      { header: 'Created', key: 'created', width: 22 },
     ];
     sheet.getRow(1).font = { bold: true };
     for (const t of sectionTickets(section.id)) {
@@ -298,7 +273,7 @@ eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, as
       });
     }
   }
-  if (sections.length === 0) wb.addWorksheet('Leer');
+  if (sections.length === 0) wb.addWorksheet('Empty');
   res.setHeader('Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition',

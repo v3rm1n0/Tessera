@@ -1,143 +1,156 @@
 # Voreinlass
 
-Einlass-Monitoring mit Rollen, QR-Code-Generierung und mobilem Scanner.
+Entry monitoring with roles, QR-code generation and a mobile scanner.
 
-## Start (NixOS)
+## Start (NixOS, dev only)
 
 ```sh
-nix develop          # oder: nix shell nixpkgs#nodejs_24
+nix develop          # or: nix shell nixpkgs#nodejs_24
 npm install
 npm start            # http://localhost:3000
 ```
 
-Beim ersten Start wird ein **Owner-Konto** angelegt und die Zugangsdaten werden
-in der Konsole ausgegeben (Passwort via `OWNER_PASSWORD=… npm start` setzbar).
-Die Datenbank liegt in `data/voreinlass.db` (SQLite, via `node:sqlite` — keine
-nativen Module nötig).
+Nix is only used for local development (via `flake.nix`); it is **not** the
+deployment target. Production deploys target Debian — see
+`deploy/voreinlass.service` for a ready-to-use systemd unit (Node.js via
+NodeSource, an `/opt/voreinlass` checkout, a dedicated system user via
+`DynamicUser`, and a `StateDirectory` for the database).
 
-### Datenbank-Migrationen
+On first start an **owner account** is created and its credentials are
+printed to the console (the password can be set via
+`OWNER_PASSWORD=… npm start`). The database lives in `data/voreinlass.db`
+(SQLite, via `node:sqlite` — no native modules required).
 
-Das Schema wird über versionierte, idempotente Migrationen in
-`server/migrate.js` verwaltet (Tabelle `schema_migrations`). Der Server wendet
-ausstehende Migrationen beim Start automatisch an; für einen expliziten Lauf
-(z. B. im Deploy):
+### Database migrations
+
+The schema is managed through versioned, idempotent migrations in
+`server/migrate.js` (table `schema_migrations`). The server applies any
+pending migrations automatically on startup; to run them explicitly (e.g.
+during a deploy):
 
 ```sh
-npm run migrate                                   # lokal
-DATA_DIR=/var/lib/voreinlass node server/migrate.js   # auf dem Server
+npm run migrate                                       # locally
+DATA_DIR=/var/lib/voreinlass node server/migrate.js    # on the server
 ```
 
-Der Lauf ist gefahrlos wiederholbar und funktioniert auch auf einer bereits
-bestehenden Datenbank (bereits vorhandene Strukturen werden übersprungen).
+The run is safe to repeat and also works against an already up-to-date
+database (existing structures are skipped).
 
-> **Kamera:** Browser erlauben Kamerazugriff nur über HTTPS oder `localhost`.
-> Für Scanner-Handys im LAN also einen Reverse-Proxy mit TLS (z. B. Caddy)
-> davorschalten oder einen Tunnel nutzen.
+> **Camera:** browsers only allow camera access over HTTPS or `localhost`.
+> For scanner phones on the LAN, put a TLS reverse proxy (e.g. Caddy) in
+> front, or use a tunnel.
 
-## Rollen
+## Roles
 
-| Rolle | Rechte |
+| Role | Permissions |
 |---|---|
-| **Owner** | Nur Verwaltung: Events anlegen, Event-Admin-/Scanner-Konten erstellen und Events zuweisen. **Kein** Scannen und **kein** Dashboard. |
-| **Event-Admin** | Zuständig für die zugewiesenen Events: Abteilungen (mit Farbe) und Unterabteilungen anlegen, UUIDs generieren, Einlasskarten gestalten und exportieren, Excel-Export, tägliche Reset-Zeit festlegen. Sieht auch Dashboard/Scanner. |
-| **Scanner** | Scannen + Dashboard der zugewiesenen Events |
+| **Owner** | Administration only: create events, create Event Admin/Scanner accounts and assign them to events. **No** scanning and **no** dashboard. |
+| **Event Admin** | Responsible for their assigned events: create sections (with color) and subsections, generate UUIDs, design and export admission cards, Excel export, set the daily reset time. Also sees the dashboard/scanner. |
+| **Scanner** | Scanning + dashboard for the assigned events |
 
-Abteilungen, UUIDs und Einlasskarten verwaltet **nur** der Event-Admin — der
-Owner hat auf diese Endpunkte keinen Zugriff und landet nach dem Login direkt
-in der Verwaltung. Der Owner legt Konten direkt im jeweiligen Event an
-(Event-Kachel → „+ Konto") oder weist bestehende Konten zu.
+Sections, UUIDs and admission cards are managed **only** by the Event Admin —
+the Owner has no access to those endpoints and lands directly in
+Administration after login. The Owner creates accounts directly inside an
+event (event tile → "+ Account") or assigns existing accounts to it.
 
-**Abteilungsfarben:** Jede Abteilung erhält beim Anlegen automatisch eine
-Farbe aus einer Palette (oder eine selbst gewählte). Sie erscheint im Dashboard
-und ist die Hauptfarbe der Einlasskarte.
+**Section colors:** every section is automatically assigned a color from a
+palette when created (or a custom one). It appears on the dashboard and is
+the admission card's main color.
 
-**Unterabteilungen:** Abteilungen können optional Unterabteilungen haben
-(z. B. Ordnungsdienst → Eingangsordner / Innenraum Ordner). In der Verwaltung
-erscheint jede Abteilung als Karte, die ihre Unterabteilungen als eingebettete
-Karten enthält — jede Ebene mit eigenem Code-Zähler und UUID-Generator. UUIDs
-werden pro Ebene erzeugt; Karten-Label und Scan-Feedback zeigen dann
-„Abteilung – Unterabteilung".
+**Subsections:** sections can optionally have subsections (e.g. Security →
+Entrance crew / Floor crew). In Administration each section appears as a
+card that contains its subsections as nested cards — each level has its own
+code counter and UUID generator. UUIDs are generated per level; the card
+label and scan feedback then show "Section – Subsection".
 
-**Einlasskarten:** Die Einlasskarte wird **einmal pro Event** gestaltet —
-Hintergrundbild, Titel und Text (mit `**Fettdruck**`) sind frei wählbar. Ein
-einziger Export erzeugt für **jede UUID aller Abteilungen** eine Karte: im
-Browser auf einem `<canvas>` zusammengesetzt (Hauptfarbe der jeweiligen
-Abteilung, QR-Code + „Abteilung – Unterabteilung"), gebündelt als PNG in einer
-ZIP-Datei — je Abteilung ein Ordner, je Unterabteilung ein Unterordner
-(`Abteilung/Unterabteilung/uuid.png`). Der Server speichert nur die
-Konfiguration (kein natives Bildmodul, keine serverseitige QR-Bibliothek nötig).
+**Admission cards:** the admission card is designed **once per event** —
+background image, title and text (with `**bold**`) are freely editable. A
+single export generates a card for **every UUID of every section**:
+composited in the browser on a `<canvas>` (using the section's main color,
+a QR code and "Section – Subsection"), bundled as PNGs in a ZIP file — one
+folder per section, one subfolder per subsection
+(`Section/Subsection/uuid.png`). The server only stores the configuration
+(no native image module, no server-side QR library needed).
 
-Optional (Häkchen im Export) liegt jedem Ordner eine `UUIDs.xlsx` bei, die nur
-die zugehörige Abteilung/Unterabteilung, die UUIDs und eine leere Spalte
-„Name (Empfänger)" enthält — so können Abteilungs- und Unterabteilungsleiter
-abhaken, wer welche UUID erhalten hat.
+Optionally (checkbox in the export) each folder is bundled with a
+`UUIDs.xlsx` listing just that section's/subsection's UUIDs plus an empty
+"Name (recipient)" column — so section and subsection leads can tick off who
+received which UUID.
 
-**Kontowechsler:** Über den Bereich unten in der Seitenleiste können mehrere
-Konten gleichzeitig angemeldet sein („Konto hinzufügen") und per Klick
-gewechselt werden. Jedes Konto behält seine eigene Session (Bearer-Token).
+**Account switcher:** the area at the bottom of the sidebar lets several
+accounts be logged in at once ("Add account") and switched between with a
+click. Each account keeps its own session (bearer token).
 
-## Ablauf
+## Theme & language
 
-1. Als Owner anmelden → **Verwaltung**: Event anlegen, Konten anlegen, zuweisen.
-2. Als Event-Admin: Abteilungen (mit Farbe) und optional Unterabteilungen
-   anlegen, pro Ebene UUIDs erzeugen, die Einlasskarte einmal gestalten und
-   alle Karten als PNG-ZIP exportieren, UUIDs als Excel exportieren,
-   Reset-Zeit einstellen (Standard 00:00).
-3. Scanner öffnen **Scannen** am Handy: Kamera scannt, Feedback:
-   - **OK** (grün) mit laufender Scan-Nummer der Abteilung
-   - **Doppelt** (orange) mit der UUID des bereits gescannten Codes
-   - **Error** (rot) bei unbekanntem/ungültigem Code
-4. **Dashboard**: Abteilungs- und Scan-Zähler (heute), Klick auf eine
-   Abteilung zeigt die doppelt gescannten Codes mit UUIDs.
+Dark, light or system theme, and German/English language, are both
+auto-detected on first load (system color scheme resp. browser language)
+and can be switched at any time — on the login screen and in the
+account-switcher menu. Preferences are stored per browser and apply
+instantly, without a page reload.
 
-Die Tageszähler beziehen sich immer auf den Zeitraum seit der zuletzt
-verstrichenen Reset-Zeit — der Reset erfolgt damit exakt zur konfigurierten
-Uhrzeit, ohne Cronjob.
+## Flow
 
-Doppelscan-Schutz: Der Client ignoriert erneute Reads desselben Codes für 6 s,
-der Server wiederholt innerhalb von 5 s dieselbe OK-Antwort statt ein
-„Doppelt" zu werten.
+1. Sign in as Owner → **Administration**: create an event, create accounts,
+   assign them.
+2. As Event Admin: create sections (with color) and optionally subsections,
+   generate UUIDs per level, design the admission card once and export all
+   cards as a PNG ZIP, export UUIDs as Excel, set the reset time (default
+   00:00).
+3. Scanners open **Scan** on their phone: the camera scans, feedback is:
+   - **OK** (green) with the section's running scan number
+   - **Duplicate** (orange) with the UUID of the already-scanned code
+   - **Error** (red) for an unknown/invalid code
+4. **Dashboard**: section and scan counters (today), clicking a section
+   shows the double-scanned codes with their UUIDs.
 
-## API (Kurzüberblick)
+Daily counters always cover the period since the last elapsed reset time —
+the reset happens exactly at the configured time, without a cron job.
+
+Double-scan protection: the client ignores repeated reads of the same code
+for 6 s; the server repeats the same OK response within 5 s instead of
+counting it as a duplicate.
+
+## API (overview)
 
 ```
 POST   /api/login | /api/logout      GET /api/me
-POST   /api/admin/users              GET/DELETE ebenso            (Owner)
+POST   /api/admin/users              GET/DELETE likewise             (Owner)
 POST   /api/admin/events             POST /api/admin/events/:id/assignments
-POST   /api/admin/events/:id/users   Konto anlegen + zuweisen     (Owner)
-PATCH  /api/events/:id               { reset_time: "HH:MM" }      (Event-Admin)
+POST   /api/admin/events/:id/users   create account + assign         (Owner)
+PATCH  /api/events/:id               { reset_time: "HH:MM" }         (Event Admin)
 POST   /api/events/:id/sections      { name, color? }
 PATCH  /api/sections/:id             { color }
 POST   /api/sections/:id/subsections { name }
-GET/DELETE Unterabteilungen ebenso
+GET/DELETE subsections likewise
 POST   /api/sections/:id/tickets     { count: n, subsection_id? }
 GET    /api/sections/:id/tickets     GET /api/events/:id/tickets.xlsx
-GET    /api/events/:id/card          PUT { title, text }        (einmal pro Event)
-POST/GET/DELETE /api/events/:id/card/backdrop   (Bild-Upload, raw)
-GET    /api/events/:id/card/tickets  Flache Liste für PNG-Export
-GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles  (Event-Rollen)
-POST   /api/scan                     { code: "<uuid>" }             (Event-Rollen)
+GET    /api/events/:id/card          PUT { title, text }             (once per event)
+POST/GET/DELETE /api/events/:id/card/backdrop   (image upload, raw)
+GET    /api/events/:id/card/tickets  flat list for the PNG export
+GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles   (event roles)
+POST   /api/scan                     { code: "<uuid>" }              (event roles)
 ```
 
-Download-/Bild-Links tragen den Session-Token als `?token=` (da `<a>`/`<img>`
-keine Header senden); alle anderen Aufrufe nutzen das Bearer-Token bzw. Cookie.
+Download/image links carry the session token as `?token=` (since `<a>`/`<img>`
+cannot send headers); all other calls use the bearer token or the cookie.
 
-## Owner-Passwort vergessen?
+## Owner password recovery
 
-Die Zugangsdaten werden nur beim allerersten Start ausgegeben
-(auf dem Server: `journalctl -u voreinlass | grep -A3 'Owner-Konto'`).
-Zurücksetzen jederzeit mit:
+The credentials are only printed on the very first start (on the server:
+`journalctl -u voreinlass | grep -A3 'Owner-Konto'`). Reset at any time
+with:
 
 ```sh
-node server/reset-owner.js [neues-passwort]          # lokal
-DATA_DIR=/var/lib/voreinlass node server/reset-owner.js   # auf dem Server (sudo)
+node server/reset-owner.js [new-password]                # locally
+DATA_DIR=/var/lib/voreinlass node server/reset-owner.js   # on the server (sudo)
 ```
 
-Ohne Argument wird ein zufälliges Passwort erzeugt und angezeigt.
-Bestehende Owner-Sessions werden dabei abgemeldet.
+Without an argument a random password is generated and printed. Existing
+owner sessions are logged out in the process.
 
 ## Tests
 
 ```sh
-node --test test/api.test.mjs
+npm test
 ```

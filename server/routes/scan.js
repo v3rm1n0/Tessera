@@ -4,11 +4,7 @@ import { requireRole, canAccessEvent } from '../auth.js';
 
 export const scanRouter = Router();
 
-/**
- * Server-side guard against accidental double reads: if the same user scanned
- * the same code with result OK within this window, the original OK response is
- * repeated instead of recording a DOUBLE.
- */
+// same user re-scanning the same code within this window repeats the OK response instead of recording a DOUBLE
 const DEBOUNCE_MS = 5000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -16,7 +12,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   const code = String(req.body?.code || '').trim().toLowerCase();
   if (!UUID_RE.test(code)) {
-    return res.json({ status: 'ERROR', message: 'Ungültiger Code' });
+    return res.json({ status: 'ERROR', message: 'Invalid code' });
   }
 
   const ticket = db.prepare(`
@@ -29,10 +25,10 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
     WHERE t.uuid = ?
   `).get(code);
   if (!ticket) {
-    return res.json({ status: 'ERROR', message: 'Unbekannter Code' });
+    return res.json({ status: 'ERROR', message: 'Unknown code' });
   }
   if (!canAccessEvent(req.user, ticket.event_id)) {
-    return res.json({ status: 'ERROR', message: 'Keine Berechtigung für dieses Event' });
+    return res.json({ status: 'ERROR', message: 'Not authorized for this event' });
   }
 
   const since = eventBoundary(ticket.event_id);
@@ -46,7 +42,6 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
       ORDER BY scanned_at DESC LIMIT 1
     `).get(ticket.uuid, since);
 
-    // same user re-reading the same code within the debounce window → repeat OK
     if (prev && prev.scanned_by === req.user.id && now - prev.scanned_at <= DEBOUNCE_MS) {
       db.exec('COMMIT');
       return res.json({
@@ -68,7 +63,7 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
         uuid: ticket.uuid,
         section: ticket.section_name,
         first_scanned_at: prev.scanned_at,
-        message: `Code wurde bereits gescannt: ${ticket.uuid}`,
+        message: `Code already scanned: ${ticket.uuid}`,
       });
     }
 
