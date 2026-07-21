@@ -9,6 +9,7 @@ import { renderSectionDetail } from './views/section.js';
 import { renderScanner } from './views/scanner.js';
 import { renderAdmin } from './views/admin.js';
 import { renderCardEditor } from './views/card.js';
+import { initTheme } from './theme.js';
 
 export const state = {
   user: null,        // { id, username, role, events: [...] }
@@ -230,4 +231,5 @@ function showLogin(cancelable) {
 }
 
 window.addEventListener('hashchange', route);
+initTheme();
 route();
