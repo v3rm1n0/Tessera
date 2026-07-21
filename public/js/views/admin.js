@@ -3,11 +3,7 @@ import { activeToken } from '../session.js';
 import { el, state, currentEvent, refreshUser } from '../app.js';
 import { t } from '../i18n.js';
 
-/**
- * Verwaltung. Owner: accounts, events, assignments. EventAdmin: sections,
- * UUIDs, QR codes, reset time of the assigned event — Owner has no access
- * to those, section/code management belongs to the event admins alone.
- */
+/** Administration: Owner manages accounts/events/assignments; Event Admin manages sections, UUIDs and reset time. */
 export async function renderAdmin(content) {
   const container = el('div', {});
   content.replaceChildren(container);
@@ -29,8 +25,6 @@ function flash(err) {
   alert(err.message || String(err));
 }
 
-// ================================================================== OWNER
-
 async function ownerBlock(reload) {
   const [users, events] = await Promise.all([
     api.get('/api/admin/users'),
@@ -38,7 +32,6 @@ async function ownerBlock(reload) {
   ]);
   const accounts = users.filter(u => u.role !== 'OWNER');
 
-  // --- create event
   const evName = el('input', { type: 'text', placeholder: t('admin.eventNamePh') });
   const evForm = el('form', { class: 'inline-form' },
     evName,
@@ -52,7 +45,6 @@ async function ownerBlock(reload) {
     } catch (err) { flash(err); }
   });
 
-  // --- one card per event: its accounts live here
   const eventCards = events.map(ev => {
     const assigned = accounts.filter(u => u.event_ids.includes(ev.id));
     const unassigned = accounts.filter(u => !u.event_ids.includes(ev.id));
@@ -70,7 +62,6 @@ async function ownerBlock(reload) {
       return chip;
     });
 
-    // create a new account directly inside the event
     const nName = el('input', { type: 'text', placeholder: t('admin.usernamePh'), autocomplete: 'off' });
     const nPass = el('input', { type: 'password', placeholder: t('admin.passwordPh'), autocomplete: 'new-password' });
     const nRole = el('select', { style: 'width:auto' },
@@ -89,7 +80,6 @@ async function ownerBlock(reload) {
       } catch (err) { flash(err); }
     });
 
-    // or pull in an already existing account
     const addExisting = el('select', { style: 'width:auto' },
       el('option', { value: '' }, t('admin.assignExisting')),
       unassigned.map(u => el('option', { value: u.id },
@@ -124,7 +114,6 @@ async function ownerBlock(reload) {
       unassigned.length > 0 ? el('div', { style: 'margin-top:8px' }, addExisting) : null);
   });
 
-  // --- account housekeeping (delete accounts entirely)
   const accountRows = accounts.map(u =>
     el('div', { class: 'row' },
       el('div', { class: 'grow' },
@@ -153,8 +142,6 @@ async function ownerBlock(reload) {
       : el('div', { class: 'empty' }, t('admin.noAccountsAtAll')));
 }
 
-// ============================================================ EVENT ADMIN
-
 async function eventBlock(reload) {
   const event = currentEvent();
   if (!event) {
@@ -162,7 +149,6 @@ async function eventBlock(reload) {
   }
   const dash = await api.get(`/api/events/${event.id}/dashboard`);
 
-  // --- reset time
   const resetInput = el('input', { type: 'time', value: dash.event.reset_time, style: 'width:auto' });
   const resetForm = el('form', { class: 'inline-form' },
     resetInput,
@@ -176,7 +162,6 @@ async function eventBlock(reload) {
     } catch (err) { flash(err); }
   });
 
-  // --- new section
   const secName = el('input', { type: 'text', placeholder: t('admin.sectionNamePh') });
   const secForm = el('form', { class: 'inline-form' },
     secName,
@@ -189,7 +174,7 @@ async function eventBlock(reload) {
     } catch (err) { flash(err); }
   });
 
-  // a reusable "count + generate codes" control
+  // reusable count + generate-codes control
   function uuidGen(url, body) {
     const count = el('input', { type: 'number', min: '1', max: '10000', value: '50', style: 'width:78px' });
     const btn = el('button', { class: 'btn sm' }, t('admin.genCodes'));
@@ -203,7 +188,6 @@ async function eventBlock(reload) {
     return el('div', { class: 'inline-form', style: 'width:auto;flex:0 0 auto' }, count, btn);
   }
 
-  // --- one card per section; each subsection is a card nested inside it
   const sectionCards = dash.sections.map(s => {
     const colorInput = el('input', {
       type: 'color', class: 'color-input', value: s.color, title: t('admin.sectionColor'),

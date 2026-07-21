@@ -1,8 +1,4 @@
-/**
- * Admission-card ("Einlasskarte") rendering onto a <canvas>.
- * Shared by the live editor preview and the bulk PNG export so both
- * produce identical output. The section color is the card's main color.
- */
+/** Admission-card rendering onto a <canvas>, shared by the live preview and the bulk PNG export. */
 
 export const CARD_W = 900;
 export const CARD_H = 1930;
@@ -32,11 +28,6 @@ export function qrMatrix(text) {
   return rows;
 }
 
-/**
- * Draws wrapped body text. Lines above `narrowFromY` use the full width;
- * lines level with the QR use the narrow left column so text flows around it.
- */
-
 /** Split a paragraph into word tokens, toggling bold on each `**` marker. */
 export function boldWords(paragraph) {
   const words = [];
@@ -48,6 +39,7 @@ export function boldWords(paragraph) {
   return words;
 }
 
+// lines below `narrowFromY` use the narrow left column so text flows around the QR code
 function drawRichText(ctx, text, x, yStart, { fontSize, fontFamily, lh, fullW, narrowW, narrowFromY, maxY }) {
   const regularFont = `400 ${fontSize}px ${fontFamily}`;
   const boldFont = `700 ${fontSize}px ${fontFamily}`;
@@ -129,11 +121,7 @@ function drawCover(ctx, img, x, y, w, h) {
   ctx.restore();
 }
 
-/**
- * Render one card. opts:
- *   { color, title, text, label, backdropImg (Image|null), matrix }
- * The canvas must be CARD_W×CARD_H.
- */
+/** Renders one card; the canvas must be CARD_W×CARD_H. */
 export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }) {
   const ink = contrastColor(color);
 
@@ -150,7 +138,6 @@ export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }
     ctx.fillRect(0, 0, CARD_W, BACKDROP_H);
   }
 
-  // title, overlaid near the bottom of the backdrop
   const pad = 44;
   if (title) {
     ctx.textAlign = 'left';
@@ -170,7 +157,6 @@ export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }
     ctx.shadowBlur = 0;
   }
 
-  // lower region: body text flowing around a bottom-right QR
   const lowerY = BACKDROP_H;
   const qrSize = 300;
   const qrX = CARD_W - pad - qrSize;
@@ -193,7 +179,6 @@ export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }
 
   if (matrix) drawQr(ctx, matrix, qrX, qrY, qrSize);
 
-  // section (– subsection) label under the QR
   if (label) {
     ctx.fillStyle = ink;
     ctx.textAlign = 'center';

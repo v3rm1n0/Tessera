@@ -2,10 +2,7 @@ import { Router } from 'express';
 import { db, resetBoundary } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess } from '../auth.js';
 
-/**
- * Dashboard data — event admins and scanners of the event only. The owner
- * administrates accounts/events and has no access to day-to-day statistics.
- */
+/** Dashboard data for event admins/scanners only; the owner has no access to day-to-day statistics. */
 export const dashboardRouter = Router();
 dashboardRouter.use(requireRole('EVENT_ADMIN', 'SCANNER'));
 

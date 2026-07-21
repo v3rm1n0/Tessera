@@ -13,11 +13,7 @@ function parseCookies(req) {
   return out;
 }
 
-/**
- * Attaches req.user for a valid session. Sources, in order: bearer header
- * (account switcher), ?token= query (download links, which cannot carry
- * headers), session cookie.
- */
+/** Attaches req.user for a valid session. Sources, in order: bearer header, ?token= query (download links can't send headers), session cookie. */
 export function sessionMiddleware(req, res, next) {
   const bearer = (req.headers.authorization || '').match(/^Bearer (\w+)$/)?.[1];
   const query = typeof req.query?.token === 'string' ? req.query.token : null;
@@ -62,8 +58,6 @@ export function attemptLogin(username, password) {
   return user;
 }
 
-// ---------------------------------------------------------------- guards
-
 export function requireAuth(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   next();
@@ -88,7 +82,6 @@ export function canAccessEvent(user, eventId) {
   return !!row;
 }
 
-/** Express guard for routes with :eventId. */
 export function requireEventAccess(req, res, next) {
   const eventId = Number(req.params.eventId);
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);

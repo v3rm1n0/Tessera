@@ -14,8 +14,8 @@ import { t, initI18n } from './i18n.js';
 import { renderSettingsControls } from './settings.js';
 
 export const state = {
-  user: null,        // { id, username, role, events: [...] }
-  eventId: null,     // currently selected event
+  user: null,     // { id, username, role, events: [...] }
+  eventId: null,
 };
 
 export function currentEvent() {
@@ -35,8 +35,6 @@ export async function refreshUser() {
   state.eventId = events.some(e => e.id === stored) ? stored : (events[0]?.id ?? null);
 }
 
-// ------------------------------------------------------------------ dom
-
 export function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -47,8 +45,6 @@ export function el(tag, attrs = {}, ...children) {
   node.append(...children.flat().filter(c => c !== null && c !== undefined));
   return node;
 }
-
-// ------------------------------------------------------------------ shell
 
 const app = document.getElementById('app');
 let cleanup = null; // view teardown (e.g. stop the camera)
@@ -128,8 +124,6 @@ function roleLabel(role) {
   return t('role.' + role);
 }
 
-// -------------------------------------------------------- account switcher
-
 function accountSwitcher() {
   const menu = el('div', { class: 'account-menu', style: 'display:none' });
 
@@ -184,8 +178,6 @@ async function doLogout() {
   state.user = null;
   route();
 }
-
-// ------------------------------------------------------------------ router
 
 async function route() {
   cleanup?.();
