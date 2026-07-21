@@ -188,15 +188,14 @@ async function eventBlock(reload) {
     } catch (err) { flash(err); }
   });
 
-  // a reusable "count + generate UUIDs" control
-  function uuidGen(url, body, doneLabel) {
+  // a reusable "count + generate codes" control
+  function uuidGen(url, body) {
     const count = el('input', { type: 'number', min: '1', max: '10000', value: '50', style: 'width:78px' });
-    const btn = el('button', { class: 'btn sm' }, 'UUIDs erzeugen');
+    const btn = el('button', { class: 'btn sm' }, 'Codes generieren');
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       try {
-        const r = await api.post(url, { count: Number(count.value), ...body });
-        alert(`${r.created} UUIDs für „${doneLabel}" erzeugt.`);
+        await api.post(url, { count: Number(count.value), ...body });
         reload();
       } catch (err) { flash(err); btn.disabled = false; }
     });
@@ -222,7 +221,7 @@ async function eventBlock(reload) {
         el('div', { class: 'grow' },
           el('div', { class: 'title', style: 'font-size:14px' }, sub.name),
           el('div', { class: 'muted', style: 'font-size:12px' }, `${sub.ticket_count} Codes`)),
-        uuidGen(`/api/sections/${s.id}/tickets`, { subsection_id: sub.id }, `${s.name} – ${sub.name}`),
+        uuidGen(`/api/sections/${s.id}/tickets`, { subsection_id: sub.id }),
         el('button', {
           class: 'btn danger sm', title: 'Unterabteilung löschen',
           onclick: async () => {
@@ -257,7 +256,7 @@ async function eventBlock(reload) {
         el('div', { class: 'grow' },
           el('div', { class: 'title', style: 'font-size:14px' }, 'Ohne Unterabteilung'),
           el('div', { class: 'muted', style: 'font-size:12px' }, `${directCount} Codes`)),
-        uuidGen(`/api/sections/${s.id}/tickets`, {}, s.name)),
+        uuidGen(`/api/sections/${s.id}/tickets`, {})),
       subCards.length ? el('div', { class: 'subcards' }, subCards) : null,
       subForm);
   });
