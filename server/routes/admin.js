@@ -67,6 +67,35 @@ adminRouter.delete('/events/:id', (req, res) => {
 
 // -------------------------------------------------------------- assignments
 
+/** Creates an account and assigns it to the event in one step. */
+adminRouter.post('/events/:id/users', (req, res) => {
+  const eventId = Number(req.params.id);
+  const event = db.prepare('SELECT id FROM events WHERE id = ?').get(eventId);
+  if (!event) return res.status(404).json({ error: 'Event nicht gefunden' });
+  const { username, password, role } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+  }
+  if (!['EVENT_ADMIN', 'SCANNER'].includes(role)) {
+    return res.status(400).json({ error: 'Rolle muss EVENT_ADMIN oder SCANNER sein' });
+  }
+  db.exec('BEGIN');
+  try {
+    const info = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+      .run(username.trim(), hashPassword(password), role);
+    db.prepare('INSERT INTO event_assignments (user_id, event_id) VALUES (?, ?)')
+      .run(Number(info.lastInsertRowid), eventId);
+    db.exec('COMMIT');
+    res.status(201).json({ id: Number(info.lastInsertRowid), username: username.trim(), role });
+  } catch (e) {
+    db.exec('ROLLBACK');
+    if (String(e.message).includes('UNIQUE')) {
+      return res.status(409).json({ error: 'Benutzername bereits vergeben' });
+    }
+    throw e;
+  }
+});
+
 adminRouter.post('/events/:id/assignments', (req, res) => {
   const eventId = Number(req.params.id);
   const userId = Number(req.body?.userId);

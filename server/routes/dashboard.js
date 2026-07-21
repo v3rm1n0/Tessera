@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import { db, resetBoundary } from '../db.js';
-import { requireAuth, requireEventAccess, requireSectionAccess } from '../auth.js';
+import { requireRole, requireEventAccess, requireSectionAccess } from '../auth.js';
 
-/** Dashboard data — visible to every role with access to the event. */
+/**
+ * Dashboard data — event admins and scanners of the event only. The owner
+ * administrates accounts/events and has no access to day-to-day statistics.
+ */
 export const dashboardRouter = Router();
-dashboardRouter.use(requireAuth);
+dashboardRouter.use(requireRole('EVENT_ADMIN', 'SCANNER'));
 
 dashboardRouter.get('/events/:eventId/dashboard', requireEventAccess, (req, res) => {
   const since = resetBoundary(req.event.reset_time);

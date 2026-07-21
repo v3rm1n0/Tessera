@@ -35,6 +35,7 @@ async function ownerBlock(reload) {
     api.get('/api/admin/users'),
     api.get('/api/admin/events'),
   ]);
+  const accounts = users.filter(u => u.role !== 'OWNER');
 
   // --- create event
   const evName = el('input', { type: 'text', placeholder: 'Event-Name' });
@@ -50,91 +51,104 @@ async function ownerBlock(reload) {
     } catch (err) { flash(err); }
   });
 
-  // --- create user
-  const uName = el('input', { type: 'text', placeholder: 'Benutzername', autocomplete: 'off' });
-  const uPass = el('input', { type: 'password', placeholder: 'Passwort', autocomplete: 'new-password' });
-  const uRole = el('select', {},
-    el('option', { value: 'SCANNER' }, 'Scanner'),
-    el('option', { value: 'EVENT_ADMIN' }, 'Event-Admin'));
-  const uForm = el('form', { class: 'inline-form' },
-    uName, uPass, uRole,
-    el('button', { class: 'btn', type: 'submit' }, 'Konto anlegen'));
-  uForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    try {
-      await api.post('/api/admin/users', {
-        username: uName.value, password: uPass.value, role: uRole.value,
-      });
-      reload();
-    } catch (err) { flash(err); }
-  });
+  // --- one card per event: its accounts live here
+  const eventCards = events.map(ev => {
+    const assigned = accounts.filter(u => u.event_ids.includes(ev.id));
+    const unassigned = accounts.filter(u => !u.event_ids.includes(ev.id));
 
-  // --- user list with assignments
-  const userRows = users.filter(u => u.role !== 'OWNER').map(u => {
-    const assignSelect = el('select', { style: 'width:auto' },
-      el('option', { value: '' }, 'Event zuweisen …'),
-      events.filter(ev => !u.event_ids.includes(ev.id))
-        .map(ev => el('option', { value: ev.id }, ev.name)));
-    assignSelect.addEventListener('change', async () => {
-      if (!assignSelect.value) return;
+    const memberChips = assigned.map(u => {
+      const chip = el('button', {
+        class: 'btn secondary sm', type: 'button',
+        title: 'Zuweisung entfernen',
+      }, `${u.username} (${u.role === 'EVENT_ADMIN' ? 'Admin' : 'Scanner'}) ✕`);
+      chip.addEventListener('click', async () => {
+        if (!confirm(`„${u.username}" von „${ev.name}" entfernen?`)) return;
+        try { await api.del(`/api/admin/events/${ev.id}/assignments/${u.id}`); reload(); }
+        catch (err) { flash(err); }
+      });
+      return chip;
+    });
+
+    // create a new account directly inside the event
+    const nName = el('input', { type: 'text', placeholder: 'Benutzername', autocomplete: 'off' });
+    const nPass = el('input', { type: 'password', placeholder: 'Passwort', autocomplete: 'new-password' });
+    const nRole = el('select', { style: 'width:auto' },
+      el('option', { value: 'SCANNER' }, 'Scanner'),
+      el('option', { value: 'EVENT_ADMIN' }, 'Event-Admin'));
+    const createForm = el('form', { class: 'inline-form', style: 'flex-wrap:wrap' },
+      nName, nPass, nRole,
+      el('button', { class: 'btn sm', type: 'submit' }, '+ Konto'));
+    createForm.addEventListener('submit', async e => {
+      e.preventDefault();
       try {
-        await api.post(`/api/admin/events/${assignSelect.value}/assignments`, { userId: u.id });
+        await api.post(`/api/admin/events/${ev.id}/users`, {
+          username: nName.value, password: nPass.value, role: nRole.value,
+        });
         reload();
       } catch (err) { flash(err); }
     });
-    return el('div', { class: 'row' },
+
+    // or pull in an already existing account
+    const addExisting = el('select', { style: 'width:auto' },
+      el('option', { value: '' }, 'Bestehendes Konto zuweisen …'),
+      unassigned.map(u => el('option', { value: u.id },
+        `${u.username} (${u.role === 'EVENT_ADMIN' ? 'Admin' : 'Scanner'})`)));
+    addExisting.addEventListener('change', async () => {
+      if (!addExisting.value) return;
+      try {
+        await api.post(`/api/admin/events/${ev.id}/assignments`, { userId: Number(addExisting.value) });
+        reload();
+      } catch (err) { flash(err); }
+    });
+
+    return el('div', { class: 'card', style: 'margin-bottom:14px' },
+      el('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:10px' },
+        el('div', { class: 'title', style: 'flex:1;font-weight:600' }, ev.name),
+        el('span', { class: 'muted', style: 'font-size:12.5px' }, `Reset ${ev.reset_time}`),
+        el('button', {
+          class: 'btn danger sm',
+          onclick: async () => {
+            if (!confirm(`Event „${ev.name}" mit allen Daten löschen?`)) return;
+            try {
+              await api.del(`/api/admin/events/${ev.id}`);
+              await refreshUser();
+              reload();
+            } catch (err) { flash(err); }
+          },
+        }, 'Löschen')),
+      el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px' },
+        memberChips.length > 0 ? memberChips
+          : el('span', { class: 'muted', style: 'font-size:13px' }, 'Noch keine Konten zugewiesen.')),
+      createForm,
+      unassigned.length > 0 ? el('div', { style: 'margin-top:8px' }, addExisting) : null);
+  });
+
+  // --- account housekeeping (delete accounts entirely)
+  const accountRows = accounts.map(u =>
+    el('div', { class: 'row' },
       el('div', { class: 'grow' },
         el('div', { class: 'title' }, u.username),
         el('div', { class: 'muted', style: 'font-size:12.5px' },
-          `${u.role === 'EVENT_ADMIN' ? 'Event-Admin' : 'Scanner'} · `,
-          u.event_ids.length === 0 ? 'keine Events' : '',
-          ...u.event_ids.map(id => {
-            const ev = events.find(e => e.id === id);
-            const chip = el('a', { href: '#', title: 'Zuweisung entfernen' },
-              `${ev?.name || id} ✕ `);
-            chip.addEventListener('click', async e => {
-              e.preventDefault();
-              try {
-                await api.del(`/api/admin/events/${id}/assignments/${u.id}`);
-                reload();
-              } catch (err) { flash(err); }
-            });
-            return chip;
-          }))),
-      assignSelect,
+          `${u.role === 'EVENT_ADMIN' ? 'Event-Admin' : 'Scanner'} · ${
+            u.event_ids.length === 0 ? 'keine Events'
+              : u.event_ids.map(id => events.find(e => e.id === id)?.name || id).join(', ')}`)),
       el('button', {
         class: 'btn danger sm',
         onclick: async () => {
-          if (!confirm(`Konto „${u.username}" löschen?`)) return;
+          if (!confirm(`Konto „${u.username}" endgültig löschen?`)) return;
           try { await api.del(`/api/admin/users/${u.id}`); reload(); } catch (err) { flash(err); }
         },
-      }, 'Löschen'));
-  });
+      }, 'Löschen')));
 
   return el('div', {},
-    el('div', { class: 'section-head' }, el('h2', {}, 'Events (Owner)')),
+    el('div', { class: 'section-head' }, el('h2', {}, 'Events')),
     evForm,
-    events.length > 0
-      ? el('div', { class: 'list', style: 'margin-top:12px' },
-          events.map(ev => el('div', { class: 'row' },
-            el('div', { class: 'grow title' }, ev.name),
-            el('span', { class: 'muted' }, `Reset ${ev.reset_time}`),
-            el('button', {
-              class: 'btn danger sm',
-              onclick: async () => {
-                if (!confirm(`Event „${ev.name}" mit allen Daten löschen?`)) return;
-                try {
-                  await api.del(`/api/admin/events/${ev.id}`);
-                  await refreshUser();
-                  reload();
-                } catch (err) { flash(err); }
-              },
-            }, 'Löschen'))))
-      : null,
-    el('div', { class: 'section-head' }, el('h2', {}, 'Konten (Owner)')),
-    uForm,
-    userRows.length > 0
-      ? el('div', { class: 'list', style: 'margin-top:12px' }, userRows)
+    el('div', { style: 'margin-top:12px' },
+      eventCards.length > 0 ? eventCards
+        : el('div', { class: 'empty' }, 'Noch keine Events angelegt.')),
+    el('div', { class: 'section-head' }, el('h2', {}, 'Alle Konten')),
+    accountRows.length > 0
+      ? el('div', { class: 'list' }, accountRows)
       : el('div', { class: 'empty' }, 'Noch keine Konten angelegt.'));
 }
 

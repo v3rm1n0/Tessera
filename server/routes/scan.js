@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db, eventBoundary } from '../db.js';
-import { requireAuth, canAccessEvent } from '../auth.js';
+import { requireRole, canAccessEvent } from '../auth.js';
 
 export const scanRouter = Router();
 
@@ -13,7 +13,7 @@ const DEBOUNCE_MS = 5000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-scanRouter.post('/scan', requireAuth, (req, res) => {
+scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   const code = String(req.body?.code || '').trim().toLowerCase();
   if (!UUID_RE.test(code)) {
     return res.json({ status: 'ERROR', message: 'Ungültiger Code' });

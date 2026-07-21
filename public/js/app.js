@@ -49,18 +49,27 @@ export function el(tag, attrs = {}, ...children) {
 const app = document.getElementById('app');
 let cleanup = null; // view teardown (e.g. stop the camera)
 
+const EVENT_ROLES = ['EVENT_ADMIN', 'SCANNER'];
+
 const ROUTES = [
-  { path: /^#\/dashboard$/, title: 'Dashboard', render: renderDashboard },
-  { path: /^#\/sections\/(\d+)$/, title: 'Abteilung', render: renderSectionDetail },
-  { path: /^#\/scanner$/, title: 'Scannen', render: renderScanner, bare: true },
+  { path: /^#\/dashboard$/, title: 'Dashboard', render: renderDashboard, roles: EVENT_ROLES },
+  { path: /^#\/sections\/(\d+)$/, title: 'Abteilung', render: renderSectionDetail, roles: EVENT_ROLES },
+  { path: /^#\/scanner$/, title: 'Scannen', render: renderScanner, bare: true, roles: EVENT_ROLES },
   { path: /^#\/verwaltung$/, title: 'Verwaltung', render: renderAdmin, roles: ['OWNER', 'EVENT_ADMIN'] },
 ];
 
+/** The owner administrates only; day-to-day views belong to the event roles. */
+function defaultRoute() {
+  return state.user.role === 'OWNER' ? '#/verwaltung' : '#/dashboard';
+}
+
 function navItems() {
-  const items = [
-    { hash: '#/dashboard', label: 'Dashboard', icon: '▦' },
-    { hash: '#/scanner', label: 'Scannen', icon: '⛶' },
-  ];
+  const items = [];
+  if (EVENT_ROLES.includes(state.user.role)) {
+    items.push(
+      { hash: '#/dashboard', label: 'Dashboard', icon: '▦' },
+      { hash: '#/scanner', label: 'Scannen', icon: '⛶' });
+  }
   if (['OWNER', 'EVENT_ADMIN'].includes(state.user.role)) {
     items.push({ hash: '#/verwaltung', label: 'Verwaltung', icon: '⚙' });
   }
@@ -92,7 +101,7 @@ function renderShell(title, bare) {
   }
   sidebar.addEventListener('click', e => { if (e.target.closest('a')) closeMenu(); });
 
-  const eventPicker = state.user.events.length > 1
+  const eventPicker = state.user.role !== 'OWNER' && state.user.events.length > 1
     ? el('select', {
         onchange: e => selectEvent(Number(e.target.value)),
         style: 'width:auto',
@@ -196,12 +205,12 @@ async function route() {
 
   const match = ROUTES.map(r => ({ r, m: location.hash.match(r.path) })).find(x => x.m);
   if (!match) {
-    location.hash = '#/dashboard';
+    location.hash = defaultRoute();
     return;
   }
   const { r, m } = match;
   if (r.roles && !r.roles.includes(state.user.role)) {
-    location.hash = '#/dashboard';
+    location.hash = defaultRoute();
     return;
   }
   const content = renderShell(r.title, r.bare);
@@ -213,7 +222,7 @@ function showLogin(cancelable) {
   renderLogin(app, result => {
     addAccount(result);
     state.user = null;
-    location.hash = '#/dashboard';
+    location.hash = result.role === 'OWNER' ? '#/verwaltung' : '#/dashboard';
     route();
   }, cancelable && activeAccount() ? () => { state.user = null; route(); } : null);
 }

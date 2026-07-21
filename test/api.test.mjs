@@ -238,6 +238,29 @@ test('sections, UUIDs and QR codes are EVENT_ADMIN-only', async () => {
   assert.equal((await owner('PATCH', `/api/events/${eventId}`, { reset_time: '05:00' })).status, 403);
 });
 
+test('owner cannot scan or view dashboards', async () => {
+  assert.equal((await owner('GET', `/api/events/${eventId}/dashboard`)).status, 403);
+  assert.equal((await owner('GET', `/api/sections/${sectionId}/doubles`)).status, 403);
+  assert.equal((await owner('POST', '/api/scan', { code: uuids[3] })).status, 403);
+});
+
+test('owner creates an account directly inside an event', async () => {
+  const r = await owner('POST', `/api/admin/events/${eventId}/users`,
+    { username: 'gate1', password: 'pw-gate1', role: 'SCANNER' });
+  assert.equal(r.status, 201);
+
+  const gate = client('gate1');
+  await gate('POST', '/api/login', { username: 'gate1', password: 'pw-gate1' });
+  const me = await gate('GET', '/api/me');
+  assert.deepEqual(me.data.events.map(e => e.id), [eventId]);
+  // assigned in the same step → may scan and see the dashboard immediately
+  assert.equal((await gate('GET', `/api/events/${eventId}/dashboard`)).status, 200);
+
+  // duplicate username rolls back cleanly
+  assert.equal((await owner('POST', `/api/admin/events/${eventId}/users`,
+    { username: 'gate1', password: 'x', role: 'SCANNER' })).status, 409);
+});
+
 test('bearer token and ?token= work for the account switcher', async () => {
   const res = await fetch(base + '/api/login', {
     method: 'POST',
