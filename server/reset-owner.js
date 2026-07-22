@@ -5,6 +5,11 @@
  */
 import { randomUUID } from 'node:crypto';
 import { db, hashPassword } from './db.js';
+import { runMigrations } from './migrate.js';
+
+// ensure the schema exists; the server does this on boot, but this script
+// may run first on a fresh install (idempotent — a no-op once migrated)
+runMigrations(db);
 
 const password = process.argv[2] || randomUUID().slice(0, 8);
 if (password.length < 6) {
