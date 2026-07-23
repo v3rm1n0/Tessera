@@ -8,6 +8,10 @@ const COOKIE = 'voreinlass_session';
 // account costs the same scrypt work as a wrong password (no timing oracle)
 const DUMMY_HASH = hashPassword(randomBytes(16).toString('hex'));
 
+// mark the cookie Secure in production (served over HTTPS); left off in dev/test
+// so http://localhost keeps working
+const SECURE = process.env.NODE_ENV === 'production' ? ' Secure;' : '';
+
 function parseCookies(req) {
   const out = {};
   for (const part of (req.headers.cookie || '').split(';')) {
@@ -45,7 +49,7 @@ export function login(res, userId) {
   db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)')
     .run(token, userId, Date.now() + SESSION_TTL_MS);
   res.setHeader('Set-Cookie',
-    `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
+    `${COOKIE}=${token}; HttpOnly;${SECURE} SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
   return token;
 }
 
@@ -53,7 +57,7 @@ export function logout(req, res) {
   if (req.sessionToken) {
     db.prepare('DELETE FROM sessions WHERE token = ?').run(req.sessionToken);
   }
-  res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+  res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly;${SECURE} SameSite=Strict; Path=/; Max-Age=0`);
 }
 
 export function attemptLogin(username, password) {
