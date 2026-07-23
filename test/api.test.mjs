@@ -357,3 +357,17 @@ test('unauthenticated requests are rejected', async () => {
   assert.equal((await anon('GET', `/api/events/${eventId}/dashboard`)).status, 401);
   assert.equal((await anon('POST', '/api/scan', { code: uuids[0] })).status, 401);
 });
+
+test('repeated failed logins are rate limited', async () => {
+  let limited = false;
+  for (let i = 0; i < 12; i++) {
+    const r = await fetch(base + '/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'brute-victim', password: 'nope' }),
+    });
+    if (r.status === 429) { limited = true; assert.ok(r.headers.get('retry-after')); break; }
+    assert.equal(r.status, 401);
+  }
+  assert.ok(limited, 'expected a 429 after repeated failed logins');
+});
