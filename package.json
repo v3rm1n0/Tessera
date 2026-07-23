@@ -2,6 +2,8 @@
   "name": "tessera",
   "version": "1.2.0",
   "description": "Entry monitoring system with role-based access, QR scanning and admission-card generation",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "V3RM1N",
   "type": "module",
   "main": "server/index.js",
   "scripts": {

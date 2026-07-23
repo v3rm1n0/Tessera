@@ -155,3 +155,13 @@ owner sessions are logged out in the process.
 ```sh
 npm test
 ```
+
+## License
+
+Copyright © 2026 V3RM1N.
+
+Tessera is **source-available**, not open source: it is licensed under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). You may use, modify and share
+it for **any noncommercial purpose** (personal, charitable, educational,
+research, government). **Commercial use requires a separate license** — contact
+the copyright holder to arrange one.
