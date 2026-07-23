@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID, scryptSync, randomBytes } from 'node:crypto';
+import { randomUUID, scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -40,7 +40,9 @@ export function hashPassword(password) {
 export function verifyPassword(password, stored) {
   const [salt, hash] = stored.split(':');
   if (!salt || !hash) return false;
-  return scryptSync(password, salt, 64).toString('hex') === hash;
+  const expected = Buffer.from(hash, 'hex');
+  const actual = scryptSync(password, salt, expected.length);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
 /** Timestamp (ms) of the most recent daily reset; "today" = scans with scanned_at >= this, so counts reset at the configured time without a cron job. */

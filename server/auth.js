@@ -1,8 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { db, verifyPassword } from './db.js';
+import { db, verifyPassword, hashPassword } from './db.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 const COOKIE = 'voreinlass_session';
+
+// a real hash to verify against when the username is unknown, so a missing
+// account costs the same scrypt work as a wrong password (no timing oracle)
+const DUMMY_HASH = hashPassword(randomBytes(16).toString('hex'));
 
 function parseCookies(req) {
   const out = {};
@@ -54,7 +58,9 @@ export function logout(req, res) {
 
 export function attemptLogin(username, password) {
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-  if (!user || !verifyPassword(password, user.password_hash)) return null;
+  // hash even when the user is missing to keep the response time constant
+  const ok = verifyPassword(password, user ? user.password_hash : DUMMY_HASH);
+  if (!user || !ok) return null;
   return user;
 }
 
