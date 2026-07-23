@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID, scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
+import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +29,11 @@ export function pickSectionColor(eventId) {
   const free = SECTION_COLORS.filter(c => !used.includes(c));
   const pool = free.length > 0 ? free : SECTION_COLORS;
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/** A high-entropy, reasonably typeable random password for generated accounts. */
+export function randomPassword() {
+  return randomBytes(12).toString('base64url'); // ~16 chars, 96 bits
 }
 
 export function hashPassword(password) {
@@ -65,7 +70,7 @@ export function eventBoundary(eventId) {
 export function seedOwner() {
   const existing = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'OWNER'").get();
   if (existing.n > 0) return null;
-  const password = process.env.OWNER_PASSWORD || randomUUID().slice(0, 8);
+  const password = process.env.OWNER_PASSWORD || randomPassword();
   db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
     .run('owner', hashPassword(password), 'OWNER');
   return { username: 'owner', password };

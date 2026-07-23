@@ -3,15 +3,14 @@
  * Usage: node server/reset-owner.js [new-password]
  * Without an argument a random password is generated and printed.
  */
-import { randomUUID } from 'node:crypto';
-import { db, hashPassword } from './db.js';
+import { db, hashPassword, randomPassword } from './db.js';
 import { runMigrations } from './migrate.js';
 
 // ensure the schema exists; the server does this on boot, but this script
 // may run first on a fresh install (idempotent — a no-op once migrated)
 runMigrations(db);
 
-const password = process.argv[2] || randomUUID().slice(0, 8);
+const password = process.argv[2] || randomPassword();
 if (password.length < 6) {
   console.error('Passwort muss mindestens 6 Zeichen haben.');
   process.exit(1);
