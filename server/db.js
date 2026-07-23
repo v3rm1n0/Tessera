@@ -9,7 +9,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 export const db = new DatabaseSync(
-  process.env.NODE_ENV === 'test' ? ':memory:' : path.join(DATA_DIR, 'voreinlass.db')
+  process.env.NODE_ENV === 'test' ? ':memory:' : path.join(DATA_DIR, 'tessera.db')
 );
 
 // connection settings (the schema itself is created by server/migrate.js)

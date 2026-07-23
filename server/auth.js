@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { db, verifyPassword, hashPassword } from './db.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
-const COOKIE = 'voreinlass_session';
+const COOKIE = 'tessera_session';
 
 // a real hash to verify against when the username is unknown, so a missing
 // account costs the same scrypt work as a wrong password (no timing oracle)

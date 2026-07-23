@@ -1,5 +1,5 @@
 {
-  "name": "voreinlass",
+  "name": "tessera",
   "version": "1.2.0",
   "description": "Entry monitoring system with role-based access, QR scanning and admission-card generation",
   "type": "module",

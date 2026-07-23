@@ -1,4 +1,4 @@
-# Voreinlass
+# Tessera
 
 Entry monitoring with roles, QR-code generation and a mobile scanner.
 
@@ -12,13 +12,13 @@ npm start            # http://localhost:3000
 
 Nix is only used for local development (via `flake.nix`); it is **not** the
 deployment target. Production deploys target Debian — see
-`deploy/voreinlass.service` for a ready-to-use systemd unit (Node.js via
-NodeSource, an `/opt/voreinlass` checkout, a dedicated system user via
+`deploy/tessera.service` for a ready-to-use systemd unit (Node.js via
+NodeSource, an `/opt/tessera` checkout, a dedicated system user via
 `DynamicUser`, and a `StateDirectory` for the database).
 
 On first start an **owner account** is created and its credentials are
 printed to the console (the password can be set via
-`OWNER_PASSWORD=… npm start`). The database lives in `data/voreinlass.db`
+`OWNER_PASSWORD=… npm start`). The database lives in `data/tessera.db`
 (SQLite, via `node:sqlite` — no native modules required).
 
 ### Database migrations
@@ -30,7 +30,7 @@ during a deploy):
 
 ```sh
 npm run migrate                                       # locally
-DATA_DIR=/var/lib/voreinlass node server/migrate.js    # on the server
+DATA_DIR=/var/lib/tessera node server/migrate.js    # on the server
 ```
 
 The run is safe to repeat and also works against an already up-to-date
@@ -132,18 +132,19 @@ GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles   (event role
 POST   /api/scan                     { code: "<uuid>" }              (event roles)
 ```
 
-Download/image links carry the session token as `?token=` (since `<a>`/`<img>`
-cannot send headers); all other calls use the bearer token or the cookie.
+Downloads and the card background are fetched with the bearer token and handed
+to the browser from an in-memory blob, so the token never appears in a URL; all
+calls authenticate via the bearer token or the session cookie.
 
 ## Owner password recovery
 
 The credentials are only printed on the very first start (on the server:
-`journalctl -u voreinlass | grep -A3 'Owner-Konto'`). Reset at any time
+`journalctl -u tessera | grep -A3 'Owner-Konto'`). Reset at any time
 with:
 
 ```sh
 node server/reset-owner.js [new-password]                # locally
-DATA_DIR=/var/lib/voreinlass node server/reset-owner.js   # on the server (sudo)
+DATA_DIR=/var/lib/tessera node server/reset-owner.js   # on the server (sudo)
 ```
 
 Without an argument a random password is generated and printed. Existing

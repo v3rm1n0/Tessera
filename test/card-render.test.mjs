@@ -45,7 +45,7 @@ test('qrMatrix builds a square boolean matrix', () => {
 test('drawCard renders without a backdrop (text + QR drawn, no image)', () => {
   const ctx = stubCtx();
   drawCard(ctx, {
-    color: '#2dd4a7', title: 'VOREINLASS-AUSWEIS',
+    color: '#2dd4a7', title: 'TESSERA-AUSWEIS',
     text: 'Liebe Schwester, lieber Bruder!\nVielen Dank für deinen Dienst.',
     label: 'Ordnungsdienst – Innenraum Ordner',
     backdropImg: null, matrix: qrMatrix('abc'),
@@ -87,7 +87,7 @@ test('drawCard renders a 700-weight run for **bold** body text', () => {
 test('drawCard draws the backdrop image when provided', () => {
   const ctx = stubCtx();
   drawCard(ctx, {
-    color: '#c98850', title: 'VOREINLASS-AUSWEIS', text: 'Text',
+    color: '#c98850', title: 'TESSERA-AUSWEIS', text: 'Text',
     label: 'Audio Video', backdropImg: { width: 1200, height: 1600 },
     matrix: qrMatrix('abc'),
   });

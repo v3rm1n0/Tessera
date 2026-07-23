@@ -1,5 +1,5 @@
 {
-  description = "Voreinlass - entry monitoring app";
+  description = "Tessera - entry monitoring app";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

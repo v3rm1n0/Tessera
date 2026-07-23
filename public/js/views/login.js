@@ -40,7 +40,7 @@ export function renderLogin(root, onSuccess, onCancel = null) {
   root.replaceChildren(
     el('div', { class: 'login-wrap' },
       el('div', { class: 'login-card' },
-        el('h1', {}, '⬢ Voreinlass'),
+        el('h1', {}, '⬢ Tessera'),
         form,
         el('div', { style: 'margin-top:18px' }, renderSettingsControls()))));
   username.focus();

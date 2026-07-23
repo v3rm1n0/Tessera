@@ -1,8 +1,8 @@
-const KEY = 'voreinlass_lang';
+const KEY = 'tessera_lang';
 
 export const dict = {
   de: {
-    brand: 'Voreinlass',
+    brand: 'Tessera',
     'nav.dashboard': 'Dashboard',
     'nav.scan': 'Scannen',
     'nav.admin': 'Verwaltung',
@@ -93,7 +93,7 @@ export const dict = {
     'admin.noSectionsShort': 'Noch keine Abteilungen.',
     'admin.exportXlsx': '⬇ Alle UUIDs als Excel',
     'admin.roleScanner': 'Scanner',
-    'card.defaultTitle': 'VOREINLASS-AUSWEIS',
+    'card.defaultTitle': 'TESSERA-AUSWEIS',
     'card.textPh': 'Text der Einlasskarte …',
     'card.sampleLabel': 'Abteilung',
     'card.boldTitle': 'Auswahl fett',
@@ -123,7 +123,7 @@ export const dict = {
     'card.heading': 'Einlasskarte – {name}',
   },
   en: {
-    brand: 'Voreinlass',
+    brand: 'Tessera',
     'nav.dashboard': 'Dashboard',
     'nav.scan': 'Scan',
     'nav.admin': 'Administration',
@@ -288,7 +288,7 @@ export function setLang(lang) {
   if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, lang);
   if (typeof document !== 'undefined') {
     document.documentElement.lang = lang;
-    window.dispatchEvent(new Event('voreinlass:relang'));
+    window.dispatchEvent(new Event('tessera:relang'));
   }
 }
 

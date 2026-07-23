@@ -1,4 +1,4 @@
-const KEY = 'voreinlass_theme';
+const KEY = 'tessera_theme';
 const PREFS = ['system', 'light', 'dark'];
 const META_COLOR = { dark: '#0b1220', light: '#f4f6fb' };
 

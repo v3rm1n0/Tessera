@@ -1,6 +1,6 @@
 /** Account store for the switcher: several accounts can be logged in at once, each with its own session token. */
-const KEY = 'voreinlass_accounts';
-const ACTIVE = 'voreinlass_active';
+const KEY = 'tessera_accounts';
+const ACTIVE = 'tessera_active';
 
 export function getAccounts() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }

@@ -1,49 +1,56 @@
-# Voreinlass entry monitoring — systemd unit for Debian
+# Tessera entry monitoring — systemd unit for Debian
 #
 # Install:
 #   1. Node.js >= 24 (needed for the built-in node:sqlite), e.g. via NodeSource:
 #        curl -fsSL https://deb.nodesource.com/setup_24.x | sudo bash -
 #        sudo apt-get install -y nodejs
 #   2. Deploy the app:
-#        sudo mkdir -p /opt/voreinlass
-#        sudo rsync -a --exclude node_modules --exclude data ./ /opt/voreinlass/
-#        cd /opt/voreinlass && sudo npm ci --omit=dev
+#        sudo mkdir -p /opt/tessera
+#        sudo rsync -a --exclude node_modules --exclude data ./ /opt/tessera/
+#        cd /opt/tessera && sudo npm ci --omit=dev
 #   3. Optional secrets (initial owner password):
-#        echo 'OWNER_PASSWORD=change-me' | sudo tee /etc/voreinlass/env
-#        sudo chmod 600 /etc/voreinlass/env
+#        echo 'OWNER_PASSWORD=change-me' | sudo tee /etc/tessera/env
+#        sudo chmod 600 /etc/tessera/env
 #   4. Enable:
-#        sudo cp deploy/voreinlass.service /etc/systemd/system/
+#        sudo cp deploy/tessera.service /etc/systemd/system/
 #        sudo systemctl daemon-reload
-#        sudo systemctl enable --now voreinlass
+#        sudo systemctl enable --now tessera
 #
-# The SQLite database lands in /var/lib/voreinlass (created automatically via
+# The SQLite database lands in /var/lib/tessera (created automatically via
 # StateDirectory). Put a TLS reverse proxy (nginx/Caddy) in front — the
 # scanner needs HTTPS for camera access.
+#
+# Upgrading from a previous "voreinlass" install? The state dir and DB file
+# were renamed. Carry the data over once (users will need to log in again):
+#   sudo systemctl disable --now voreinlass
+#   sudo mv /var/lib/voreinlass /var/lib/tessera
+#   cd /var/lib/tessera && sudo rename 's/^voreinlass\.db/tessera.db/' voreinlass.db*
+#   sudo rm -f /etc/systemd/system/voreinlass.service
 
 [Unit]
-Description=Voreinlass entry monitoring
+Description=Tessera entry monitoring
 After=network.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/voreinlass
+WorkingDirectory=/opt/tessera
 # apply pending schema migrations before starting (idempotent; the app would
 # also self-migrate, but this fails fast and logs migrations separately)
 ExecStartPre=/usr/bin/node server/migrate.js
 ExecStart=/usr/bin/node server/index.js
 Environment=NODE_ENV=production
 Environment=PORT=3000
-Environment=DATA_DIR=/var/lib/voreinlass
-EnvironmentFile=-/etc/voreinlass/env
+Environment=DATA_DIR=/var/lib/tessera
+EnvironmentFile=-/etc/tessera/env
 
 Restart=always
 RestartSec=3
 
-# runs as an ephemeral unprivileged user; /var/lib/voreinlass is its only
+# runs as an ephemeral unprivileged user; /var/lib/tessera is its only
 # writable state
 DynamicUser=yes
-StateDirectory=voreinlass
+StateDirectory=tessera
 StateDirectoryMode=0700
 UMask=0077
 

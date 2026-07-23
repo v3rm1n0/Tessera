@@ -25,13 +25,13 @@ export function currentEvent() {
 
 export function selectEvent(id) {
   state.eventId = id;
-  localStorage.setItem('voreinlass_event', String(id));
+  localStorage.setItem('tessera_event', String(id));
   route();
 }
 
 export async function refreshUser() {
   state.user = await api.get('/api/me');
-  const stored = Number(localStorage.getItem('voreinlass_event'));
+  const stored = Number(localStorage.getItem('tessera_event'));
   const events = state.user.events;
   state.eventId = events.some(e => e.id === stored) ? stored : (events[0]?.id ?? null);
 }
@@ -80,7 +80,7 @@ function navItems() {
 
 function renderShell(title, bare) {
   const sidebar = el('aside', { class: 'sidebar' },
-    el('div', { class: 'brand' }, el('span', { class: 'logo' }, '⬢'), 'Voreinlass'),
+    el('div', { class: 'brand' }, el('span', { class: 'logo' }, '⬢'), 'Tessera'),
     el('nav', { class: 'nav' },
       navItems().map(item =>
         el('a', {
@@ -228,7 +228,7 @@ function showLogin(cancelable) {
 }
 
 window.addEventListener('hashchange', route);
-window.addEventListener('voreinlass:relang', route);
+window.addEventListener('tessera:relang', route);
 initTheme();
 initI18n();
 route();

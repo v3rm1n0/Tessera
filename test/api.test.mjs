@@ -242,9 +242,9 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
   assert.match(cfg0.data.sample.color, /^#[0-9a-f]{6}$/i);
 
   assert.equal((await admin('PUT', `/api/events/${eventId}/card`,
-    { title: 'VOREINLASS-AUSWEIS', text: 'Liebe Schwester, **lieber** Bruder!' })).status, 200);
+    { title: 'TESSERA-AUSWEIS', text: 'Liebe Schwester, **lieber** Bruder!' })).status, 200);
   const cfg1 = await admin('GET', `/api/events/${eventId}/card`);
-  assert.equal(cfg1.data.title, 'VOREINLASS-AUSWEIS');
+  assert.equal(cfg1.data.title, 'TESSERA-AUSWEIS');
   assert.equal(cfg1.data.text, 'Liebe Schwester, **lieber** Bruder!');
 
   // flat ticket list for bulk generation carries color + label parts
