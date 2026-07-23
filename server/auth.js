@@ -21,11 +21,10 @@ function parseCookies(req) {
   return out;
 }
 
-/** Attaches req.user for a valid session. Sources, in order: bearer header, ?token= query (download links can't send headers), session cookie. */
+/** Attaches req.user for a valid session. Sources, in order: bearer header, session cookie. */
 export function sessionMiddleware(req, res, next) {
   const bearer = (req.headers.authorization || '').match(/^Bearer (\w+)$/)?.[1];
-  const query = typeof req.query?.token === 'string' ? req.query.token : null;
-  const token = bearer || query || parseCookies(req)[COOKIE];
+  const token = bearer || parseCookies(req)[COOKIE];
   if (token) {
     const row = db.prepare(`
       SELECT u.id, u.username, u.role, s.token, s.expires_at

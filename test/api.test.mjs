@@ -260,7 +260,7 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
   assert.equal(up.status, 201);
   assert.equal((await admin('GET', `/api/events/${eventId}/card`)).data.has_backdrop, true);
 
-  // serve it back verbatim, and via ?token= for <img>
+  // serve it back verbatim via an authenticated request
   const img = await fetch(base + `/api/events/${eventId}/card/backdrop`, { headers: { cookie: jars.admin } });
   assert.equal(img.status, 200);
   assert.equal(img.headers.get('content-type'), 'image/png');
@@ -269,7 +269,10 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'eva', password: 'pw-eva' }),
   })).json();
-  assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop?token=${token}`)).status, 200);
+  assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop`,
+    { headers: { Authorization: `Bearer ${token}` } })).status, 200);
+  // a token in the query string must NOT authenticate (it would leak via logs)
+  assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop?token=${token}`)).status, 401);
 
   // wrong mime rejected, scanner cannot edit
   assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop`, {
@@ -335,7 +338,7 @@ test('owner creates an account directly inside an event', async () => {
     { username: 'gate1', password: 'x', role: 'SCANNER' })).status, 409);
 });
 
-test('bearer token and ?token= work for the account switcher', async () => {
+test('bearer token authenticates the account switcher and downloads', async () => {
   const res = await fetch(base + '/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -348,8 +351,13 @@ test('bearer token and ?token= work for the account switcher', async () => {
   assert.equal(me.status, 200);
   assert.equal((await me.json()).username, 'eva');
 
-  const xlsx = await fetch(base + `/api/events/${eventId}/tickets.xlsx?token=${token}`);
+  const xlsx = await fetch(base + `/api/events/${eventId}/tickets.xlsx`,
+    { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(xlsx.status, 200);
+
+  // the same token in the query string must not authenticate
+  const leaked = await fetch(base + `/api/events/${eventId}/tickets.xlsx?token=${token}`);
+  assert.equal(leaked.status, 401);
 });
 
 test('unauthenticated requests are rejected', async () => {

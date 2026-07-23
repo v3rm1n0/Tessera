@@ -16,9 +16,17 @@ export async function renderAdmin(content) {
   await load();
 }
 
-/** Download links cannot send an Authorization header → token as query. */
-function tokenized(url) {
-  return `${url}?token=${encodeURIComponent(activeToken() || '')}`;
+/** Fetches an authenticated file and saves it, so the session token never
+ * appears in a URL (which would leak via logs, history and referrers). */
+async function download(url, filename) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${activeToken()}` } });
+  if (!res.ok) throw new Error(t('common.error', { status: res.status }));
+  const blobUrl = URL.createObjectURL(await res.blob());
+  const a = el('a', { href: blobUrl, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(blobUrl);
 }
 
 function flash(err) {
@@ -267,6 +275,12 @@ async function eventBlock(reload) {
       ? el('div', { class: 'section-cards' }, sectionCards)
       : el('div', { class: 'empty' }, t('admin.noSectionsShort')),
     el('div', { style: 'margin-top:14px' },
-      el('a', { class: 'btn secondary sm', href: tokenized(`/api/events/${event.id}/tickets.xlsx`) },
-        t('admin.exportXlsx'))));
+      el('button', {
+        class: 'btn secondary sm',
+        onclick: e => {
+          e.preventDefault();
+          download(`/api/events/${event.id}/tickets.xlsx`, `uuids-event-${event.id}.xlsx`)
+            .catch(flash);
+        },
+      }, t('admin.exportXlsx'))));
 }

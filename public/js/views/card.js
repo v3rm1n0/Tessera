@@ -73,13 +73,24 @@ export async function renderCardEditor(content, eventId) {
     } catch (err) { alert(err.message); saveBtn.disabled = false; }
   });
 
-  function loadBackdrop() {
+  async function loadBackdrop() {
     if (!cfg.has_backdrop) { backdropImg = null; preview(); return; }
-    const img = new Image();
-    img.onload = () => { backdropImg = img; preview(); };
-    img.onerror = () => { backdropImg = null; preview(); };
-    img.src = `/api/events/${eventId}/card/backdrop`
-      + `?token=${encodeURIComponent(activeToken() || '')}&t=${Date.now()}`;
+    // fetch with the auth header so the token never rides in the URL, then
+    // hand the bytes to an <img> via an object URL
+    try {
+      const res = await fetch(`/api/events/${eventId}/card/backdrop`, {
+        headers: { Authorization: `Bearer ${activeToken()}` },
+      });
+      if (!res.ok) throw new Error('backdrop fetch failed');
+      const url = URL.createObjectURL(await res.blob());
+      const img = new Image();
+      img.onload = () => { backdropImg = img; preview(); URL.revokeObjectURL(url); };
+      img.onerror = () => { backdropImg = null; preview(); URL.revokeObjectURL(url); };
+      img.src = url;
+    } catch {
+      backdropImg = null;
+      preview();
+    }
   }
 
   const fileInput = el('input', {
