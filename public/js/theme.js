@@ -1,6 +1,6 @@
 const KEY = 'tessera_theme';
 const PREFS = ['system', 'light', 'dark'];
-const META_COLOR = { dark: '#0b1220', light: '#f4f6fb' };
+const META_COLOR = { dark: '#1b1b1b', light: '#f1f1f1' };
 
 export function resolveTheme(pref, prefersLight) {
   if (pref === 'dark' || pref === 'light') return pref;

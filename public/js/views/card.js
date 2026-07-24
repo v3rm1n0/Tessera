@@ -152,7 +152,7 @@ export async function renderCardEditor(content, eventId) {
   const xlsxCheckbox = el('input', { type: 'checkbox', id: 'incl-xlsx', style: 'width:auto;margin:0' });
   const xlsxLabel = el('label', {
     for: 'incl-xlsx',
-    style: 'display:flex;align-items:center;gap:8px;margin:0;color:var(--text);cursor:pointer;font-size:13.5px',
+    style: 'display:flex;align-items:center;gap:8px;margin:0;color:var(--color-text-primary);cursor:pointer;font-size:13.5px',
   }, xlsxCheckbox, t('card.inclXlsx'));
 
   const bulkBtn = el('button', { class: 'btn' },
