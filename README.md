@@ -5,10 +5,13 @@ Entry monitoring with roles, QR-code generation and a mobile scanner.
 ## Start (NixOS, dev only)
 
 ```sh
-nix develop          # or: nix shell nixpkgs#nodejs_24
-npm install
-npm start            # http://localhost:3000
+nix develop          # or: nix shell nixpkgs#nodejs_24 nixpkgs#bun
+bun install
+bun start            # http://localhost:3000
 ```
+
+Bun is only the package manager (install + script runner); the app itself
+runs on Node.js (it relies on `node:sqlite`).
 
 Nix is only used for local development (via `flake.nix`); it is **not** the
 deployment target. Production deploys target Debian — see
@@ -18,7 +21,7 @@ NodeSource, an `/opt/tessera` checkout, a dedicated system user via
 
 On first start an **owner account** is created and its credentials are
 printed to the console (the password can be set via
-`OWNER_PASSWORD=… npm start`). The database lives in `data/tessera.db`
+`OWNER_PASSWORD=… bun start`). The database lives in `data/tessera.db`
 (SQLite, via `node:sqlite` — no native modules required).
 
 ### Database migrations
@@ -29,7 +32,7 @@ pending migrations automatically on startup; to run them explicitly (e.g.
 during a deploy):
 
 ```sh
-npm run migrate                                       # locally
+bun run migrate                                       # locally
 DATA_DIR=/var/lib/tessera node server/migrate.js    # on the server
 ```
 
@@ -153,7 +156,7 @@ owner sessions are logged out in the process.
 ## Tests
 
 ```sh
-npm test
+bun run test
 ```
 
 ## License

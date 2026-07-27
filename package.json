@@ -31,8 +31,8 @@
     "jszip": "^3.10.1",
     "qrcode-generator": "^2.0.4"
   },
-  "allowScripts": {
-    "@astryxdesign/cli@0.1.8": true,
-    "@astryxdesign/core@0.1.8": true
-  }
+  "trustedDependencies": [
+    "@astryxdesign/cli",
+    "@astryxdesign/core"
+  ]
 }

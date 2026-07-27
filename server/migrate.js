@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
  * Versioned, idempotent schema migrations. Each has a stable `id` and an
  * `up(db)` safe to run on a fresh db or one already at the final schema.
  * Applied ids are recorded in `schema_migrations`, so each runs once.
- * Run standalone with: node server/migrate.js (or: npm run migrate).
+ * Run standalone with: node server/migrate.js (or: bun run migrate).
  */
 
 // self-contained: migrations must not depend on app code

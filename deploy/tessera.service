@@ -4,10 +4,13 @@
 #   1. Node.js >= 24 (needed for the built-in node:sqlite), e.g. via NodeSource:
 #        curl -fsSL https://deb.nodesource.com/setup_24.x | sudo bash -
 #        sudo apt-get install -y nodejs
+#      plus Bun, which installs the dependencies from bun.lock (the app itself
+#      still runs on Node.js):
+#        sudo npm install -g bun
 #   2. Deploy the app:
 #        sudo mkdir -p /opt/tessera
 #        sudo rsync -a --exclude node_modules --exclude data ./ /opt/tessera/
-#        cd /opt/tessera && sudo npm ci --omit=dev
+#        cd /opt/tessera && sudo bun install --frozen-lockfile --production
 #   3. Optional secrets (initial owner password):
 #        echo 'OWNER_PASSWORD=change-me' | sudo tee /etc/tessera/env
 #        sudo chmod 600 /etc/tessera/env
