@@ -1,6 +1,9 @@
 # Tessera
 
-Entry monitoring with roles, QR-code generation and a mobile scanner.
+Entry monitoring with roles, QR-code generation and a mobile scanner. Named after the *tessera*, a small token (clay, bone or metal) used in
+ancient Rome as proof of identity or admission: to a grain ration, the
+theatre, gladiatorial games, or as a badge of hospitality. Same idea here,
+just digital: a token that gets someone through the door.
 
 ## Start (NixOS, dev only)
 
