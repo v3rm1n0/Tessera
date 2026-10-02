@@ -13,6 +13,15 @@ export function contrastColor(hex) {
   return luminance > 0.58 ? '#141414' : '#ffffff';
 }
 
+/**
+ * What a person types when the QR code will not scan: the first 12 hex digits of the uuid (the
+ * shortest start the server accepts, MIN_PREFIX_DIGITS) in groups of four. '' for anything but a uuid.
+ */
+export function shortCode(uuid) {
+  const digits = String(uuid ?? '').replaceAll('-', '').toUpperCase();
+  return /^[0-9A-F]{32}$/.test(digits) ? digits.slice(0, 12).match(/.{4}/g).join('-') : '';
+}
+
 /** QR module matrix (boolean rows) for a payload, auto-sized, ECC level M. */
 export function qrMatrix(text) {
   const qr = window.qrcode(0, 'M');
@@ -121,8 +130,8 @@ function drawCover(ctx, img, x, y, w, h) {
   ctx.restore();
 }
 
-/** Renders one card; the canvas must be CARD_W×CARD_H. */
-export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }) {
+/** Renders one card; the canvas must be CARD_W×CARD_H. `code` is the short code printed below the label. */
+export function drawCard(ctx, { color, title, text, label, code, backdropImg, matrix }) {
   const ink = contrastColor(color);
 
   ctx.fillStyle = color;
@@ -161,7 +170,8 @@ export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }
   const qrSize = 300;
   const qrX = CARD_W - pad - qrSize;
   const labelGap = 26;
-  const qrY = CARD_H - pad - 42 - qrSize; // reserve a line below the QR for the label
+  const codeGap = 44; // the code's line sits this far below the label's
+  const qrY = CARD_H - pad - 42 - (code ? codeGap : 0) - qrSize; // reserve the lines below the QR
 
   ctx.fillStyle = ink;
   ctx.textAlign = 'left';
@@ -190,5 +200,19 @@ export function drawCard(ctx, { color, title, text, label, backdropImg, matrix }
       ctx.font = `700 ${lfs}px system-ui, "Segoe UI", sans-serif`;
     }
     ctx.fillText(label, qrX + qrSize / 2, qrY + qrSize + labelGap);
+  }
+
+  if (code) {
+    ctx.fillStyle = ink;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const family = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
+    let cfs = 30;
+    ctx.font = `700 ${cfs}px ${family}`;
+    while (ctx.measureText(code).width > qrSize + 44 && cfs > 15) {
+      cfs -= 1;
+      ctx.font = `700 ${cfs}px ${family}`;
+    }
+    ctx.fillText(code, qrX + qrSize / 2, qrY + qrSize + labelGap + codeGap);
   }
 }

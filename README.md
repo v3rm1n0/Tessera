@@ -135,6 +135,13 @@ sheet (the Excel export, or the per-folder `UUIDs.xlsx` of the card export) and
 upload it again (`POST /api/events/:id/holders`, Excel or CSV, German or English
 headers, or simply a UUID column next to a name column).
 
+**Manual entry:** every card prints a short code under the QR code (the first 12
+hex digits of its UUID, e.g. `550E-8400-E29B`). When a QR code is damaged or the
+camera will not read it, the scanner taps the keyboard button and types the short
+code. `POST /api/scan` accepts a whole UUID or any start of at least 12 digits
+(case, spaces and dashes are ignored). A start is only looked up among the
+scanner's own events, and one that fits several codes is refused as ambiguous.
+
 **Undoing a scan:** a scanner can take back their own scan for a minute after
 making it (`POST /api/scans/:id/void`), event admins can void any scan of their
 events. Voided scans stop counting everywhere, and the code can be scanned again;

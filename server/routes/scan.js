@@ -3,7 +3,7 @@ import { db, eventBoundary } from '../db.js';
 import { requireRole, canAccessEvent } from '../auth.js';
 import { audit } from '../audit.js';
 import { CODES, HttpError } from '../errors.js';
-import { UUID_RE } from '../codes.js';
+import { parseCodeInput } from '../codes.js';
 
 export const scanRouter = Router();
 
@@ -19,22 +19,42 @@ const scanError = code => ({ status: 'ERROR', code, message: CODES[code] });
 /** The holder's name belongs in a scan response only when there is one. */
 const holderField = ticket => (ticket.holder ? { holder: ticket.holder } : {});
 
+const TICKET_FOR_SCAN = `
+  SELECT t.uuid, t.section_id, t.holder, t.revoked_at, s.event_id, e.archived_at,
+         CASE WHEN sub.name IS NULL THEN s.name
+              ELSE s.name || ' – ' || sub.name END AS section_name
+  FROM tickets t
+  JOIN sections s ON s.id = t.section_id
+  JOIN events e ON e.id = s.event_id
+  LEFT JOIN subsections sub ON sub.id = t.subsection_id
+`;
+
+/**
+ * The ticket for what was scanned or typed: a whole uuid, or the first digits of one (printed on the
+ * card for entering by hand). A prefix is only looked up among the caller's own events, so it says
+ * nothing about anybody else's tickets. Returns { ticket } or { error } (a scan error code).
+ */
+function findTicket(input, user) {
+  if (input.kind === 'full') return { ticket: db.prepare(`${TICKET_FOR_SCAN} WHERE t.uuid = ?`).get(input.uuid) };
+  const matches = db.prepare(`
+    ${TICKET_FOR_SCAN}
+    WHERE t.uuid LIKE ? || '%'
+      AND s.event_id IN (SELECT event_id FROM event_assignments WHERE user_id = ?)
+    LIMIT 2
+  `).all(input.prefix, user.id);
+  return matches.length > 1 ? { error: 'CODE_AMBIGUOUS' } : { ticket: matches[0] };
+}
+
 scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
-  const code = String(req.body?.code || '').trim().toLowerCase();
-  if (!UUID_RE.test(code)) {
+  const input = parseCodeInput(req.body?.code);
+  if (!input) {
     return res.json(scanError('INVALID_CODE'));
   }
 
-  const ticket = db.prepare(`
-    SELECT t.uuid, t.section_id, t.holder, t.revoked_at, s.event_id, e.archived_at,
-           CASE WHEN sub.name IS NULL THEN s.name
-                ELSE s.name || ' – ' || sub.name END AS section_name
-    FROM tickets t
-    JOIN sections s ON s.id = t.section_id
-    JOIN events e ON e.id = s.event_id
-    LEFT JOIN subsections sub ON sub.id = t.subsection_id
-    WHERE t.uuid = ?
-  `).get(code);
+  const { ticket, error } = findTicket(input, req.user);
+  if (error) {
+    return res.json(scanError(error));
+  }
   if (!ticket) {
     return res.json(scanError('UNKNOWN_CODE'));
   }

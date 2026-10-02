@@ -16,6 +16,17 @@ export async function renderScanner(content) {
   const torchButton = el('button', {
     type: 'button', class: 'torch-btn', 'aria-label': t('scan.torch'), 'aria-pressed': 'false', hidden: '',
   }, icon('torch'));
+  const manualButton = el('button', { type: 'button', class: 'manual-btn', 'aria-label': t('scan.manual') }, icon('keyboard'));
+  const manualInput = el('input', {
+    type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false',
+    maxlength: '40', placeholder: '550E-8400-E29B',
+  });
+  const manualPanel = el('form', { class: 'manual-panel', hidden: '' },
+    el('label', { class: 'field' }, el('span', {}, t('scan.manualLabel')), manualInput),
+    el('p', { class: 'muted manual-hint' }, t('scan.manualHint')),
+    el('div', { class: 'manual-actions' },
+      el('button', { type: 'button', class: 'btn secondary', onclick: () => closeManual() }, t('common.cancel')),
+      el('button', { type: 'submit', class: 'btn' }, t('scan.manualSubmit'))));
   const cameraError = el('div', { class: 'camera-error', hidden: '' },
     el('div', {},
       el('p', {}, t('scan.noCamera')),
@@ -26,6 +37,8 @@ export async function renderScanner(content) {
     el('div', { class: 'scan-frame' }, el('div', { class: 'reticle' })),
     el('div', { class: 'scan-hint' }, t('scan.hint')),
     torchButton,
+    manualButton,
+    manualPanel,
     overlay,
     cameraError);
   content.replaceChildren(view);
@@ -40,6 +53,7 @@ export async function renderScanner(content) {
   const wakeLock = createWakeLock(navigator, document);
   let running = true;
   let paused = false;              // true while a result overlay is visible
+  let manualOpen = false;          // the camera does not read codes while somebody types one
   let lastSeen = new Map();        // code -> timestamp, client-side debounce
   let rafId = 0;
   let lastDecode = 0;
@@ -97,10 +111,32 @@ export async function renderScanner(content) {
     return starting;
   }
 
+  function openManual() {
+    manualOpen = true;
+    manualPanel.hidden = false;
+    manualInput.value = '';
+    manualInput.focus();
+  }
+
+  function closeManual() {
+    manualOpen = false;
+    manualPanel.hidden = true;
+    manualInput.blur();
+  }
+
+  manualButton.addEventListener('click', () => (manualOpen ? closeManual() : openManual()));
+  manualPanel.addEventListener('submit', event => {
+    event.preventDefault();
+    const code = manualInput.value.trim();
+    if (!code) return;
+    closeManual();
+    submitCode(code);
+  });
+
   function loop(ts) {
     if (!running) return;
     rafId = requestAnimationFrame(loop);
-    if (paused || video.readyState < 2) return;
+    if (paused || manualOpen || video.readyState < 2) return;
     if (ts - lastDecode < 120) return; // decode ~8×/s, keeps CPU sane
     lastDecode = ts;
 
@@ -112,11 +148,16 @@ export async function renderScanner(content) {
     if (qr && qr.data) handleCode(qr.data.trim());
   }
 
-  async function handleCode(code) {
+  function handleCode(code) {
     const now = Date.now();
     // debounce: same physical code kept in front of the camera
     if (now - (lastSeen.get(code) || 0) < SAME_CODE_COOLDOWN_MS) return;
     lastSeen.set(code, now);
+    return submitCode(code);
+  }
+
+  /** Sends a scanned or typed code (a whole uuid or the short code of a card) and shows the result. */
+  async function submitCode(code) {
     paused = true;
 
     let result;

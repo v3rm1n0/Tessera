@@ -6,12 +6,12 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 global.window = { qrcode: require('../node_modules/qrcode-generator/dist/qrcode.js') };
 
-const { drawCard, contrastColor, qrMatrix, boldWords, CARD_W, CARD_H } =
+const { drawCard, contrastColor, qrMatrix, boldWords, shortCode, CARD_W, CARD_H } =
   await import('../public/js/card-render.js');
 
 /** Minimal 2D-context stub that records draw calls and swallows property sets. */
 function stubCtx() {
-  const calls = { fillText: 0, fillRect: 0, drawImage: 0 };
+  const calls = { fillText: 0, fillRect: 0, drawImage: 0, texts: [] };
   const target = {
     calls,
     measureText: s => ({ width: s.length * 12 }),
@@ -19,7 +19,7 @@ function stubCtx() {
     save() {}, restore() {}, beginPath() {}, moveTo() {}, arcTo() {},
     closePath() {}, fill() {}, clip() {}, rect() {},
     fillRect() { calls.fillRect++; },
-    fillText() { calls.fillText++; },
+    fillText(text, x, y) { calls.fillText++; calls.texts.push({ text, x, y }); },
     drawImage() { calls.drawImage++; },
   };
   return new Proxy(target, {
@@ -97,4 +97,52 @@ test('drawCard draws the backdrop image when provided', () => {
 test('card dimensions are exported', () => {
   assert.equal(CARD_W, 900);
   assert.ok(CARD_H > CARD_W);
+});
+
+test('shortCode is the first 12 hex digits of the uuid in groups of four', () => {
+  assert.equal(shortCode('550e8400-e29b-41d4-a716-446655440000'), '550E-8400-E29B');
+  assert.equal(shortCode('550E8400-E29B-41D4-A716-446655440000'), '550E-8400-E29B');
+  assert.equal(shortCode(''), '');
+  assert.equal(shortCode(undefined), '');
+  assert.equal(shortCode('not a uuid'), '');
+});
+
+test('the short code has exactly as many digits as the server needs to find a ticket', async () => {
+  const { MIN_PREFIX_DIGITS, parseCodeInput } = await import('../server/codes.js');
+  const code = shortCode('550e8400-e29b-41d4-a716-446655440000');
+  assert.equal(code.replaceAll('-', '').length, MIN_PREFIX_DIGITS);
+  assert.deepEqual(parseCodeInput(code), { kind: 'prefix', prefix: '550e8400-e29b' });
+});
+
+const CARD = { color: '#2dd4a7', title: 'T', text: 'Text', label: 'Audio Video', backdropImg: null };
+
+test('drawCard prints the short code as one more line below the label, inside the card', () => {
+  const without = stubCtx();
+  drawCard(without, { ...CARD, matrix: qrMatrix('abc') });
+  const withCode = stubCtx();
+  drawCard(withCode, { ...CARD, matrix: qrMatrix('abc'), code: '550E-8400-E29B' });
+
+  assert.equal(withCode.calls.fillText, without.calls.fillText + 1);
+  const label = withCode.calls.texts.find(x => x.text === 'Audio Video');
+  const code = withCode.calls.texts.find(x => x.text === '550E-8400-E29B');
+  assert.ok(code, 'the code is drawn');
+  assert.ok(code.y > label.y, 'below the label');
+  assert.equal(code.x, label.x, 'centred under the QR like the label');
+  for (const { text, y } of withCode.calls.texts) assert.ok(y > 0 && y + 16 <= CARD_H, `"${text}" stays inside the card`);
+});
+
+test('the QR moves up to make room for the code line, so the bottom margin stays the same', () => {
+  const without = stubCtx();
+  drawCard(without, { ...CARD, matrix: qrMatrix('abc') });
+  const withCode = stubCtx();
+  drawCard(withCode, { ...CARD, matrix: qrMatrix('abc'), code: '550E-8400-E29B' });
+  const labelY = ctx => ctx.calls.texts.find(x => x.text === 'Audio Video').y;
+  assert.ok(labelY(withCode) < labelY(without), 'the QR and its label sit higher when a code line follows');
+});
+
+test('a long code is shrunk to the width of the QR block', () => {
+  const ctx = stubCtx();
+  drawCard(ctx, { ...CARD, matrix: qrMatrix('abc'), code: '0123456789ABCDEF0123456789ABCDEF0123456789' });
+  const sizes = (ctx.calls.fonts || []).map(f => Number(/(\d+)px/.exec(f)?.[1])).filter(Boolean);
+  assert.ok(sizes.some(px => px < 30), 'the font was reduced until the text fit');
 });

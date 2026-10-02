@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { activeToken } from '../session.js';
 import { el } from '../app.js';
-import { CARD_W, CARD_H, drawCard, qrMatrix } from '../card-render.js';
+import { CARD_W, CARD_H, drawCard, qrMatrix, shortCode } from '../card-render.js';
 import { t } from '../i18n.js';
 
 const PLACEHOLDER_UUID = '00000000-0000-4000-8000-000000000000';
@@ -41,6 +41,7 @@ export async function renderCardEditor(content, eventId) {
       title: titleInput.value,
       text: textInput.value,
       label: sample.label,
+      code: shortCode(PLACEHOLDER_UUID),
       backdropImg,
       matrix: qrMatrix(PLACEHOLDER_UUID),
     });
@@ -144,7 +145,7 @@ export async function renderCardEditor(content, eventId) {
     off.width = CARD_W; off.height = CARD_H;
     drawCard(off.getContext('2d'), {
       color: sample.color, title: titleInput.value, text: textInput.value,
-      label: sample.label, backdropImg, matrix: qrMatrix(PLACEHOLDER_UUID),
+      label: sample.label, code: shortCode(PLACEHOLDER_UUID), backdropImg, matrix: qrMatrix(PLACEHOLDER_UUID),
     });
     off.toBlob(blob => download(blob, `Einlasskarte-${safe(cfg.event)}-${t('card.previewSuffix')}.png`), 'image/png');
   });
@@ -173,7 +174,7 @@ export async function renderCardEditor(content, eventId) {
         const label = tk.subsection ? `${tk.section} – ${tk.subsection}` : tk.section;
         drawCard(octx, {
           color: tk.color, title: titleInput.value, text: textInput.value,
-          label, backdropImg, matrix: qrMatrix(tk.uuid),
+          label, code: shortCode(tk.uuid), backdropImg, matrix: qrMatrix(tk.uuid),
         });
         const blob = await new Promise(r => off.toBlob(r, 'image/png'));
         const dir = tk.subsection
