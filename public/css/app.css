@@ -237,6 +237,17 @@ button.row:hover { background: var(--color-background-card); }
   .scan-line { grid-template-columns: 1fr 1fr; }
 }
 
+/* scan log */
+.log-row { display: grid; grid-template-columns: 11.5em 8em 1fr minmax(6em, auto); gap: var(--spacing-3); align-items: center; padding: var(--spacing-2) var(--spacing-4); background: var(--color-background-surface); border-bottom: 1px solid var(--color-border); font-size: var(--font-size-base); }
+.log-row:last-child { border-bottom: none; }
+.log-row.voided > :not(.grow) { text-decoration: line-through; opacity: 0.6; }
+.log-row.voided .grow { opacity: 0.6; }
+.log-double { color: var(--color-warning); font-weight: var(--font-weight-semibold); }
+@media (max-width: 720px) {
+  .log-row { grid-template-columns: 1fr 1fr; }
+  .log-row .grow { grid-column: 1 / -1; order: 3; }
+}
+
 /* history: one card per event day with an hourly bar chart */
 .day-card { margin-bottom: var(--spacing-4); }
 .day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-3); }

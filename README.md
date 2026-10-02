@@ -138,6 +138,10 @@ disappear at the reset.
 filter by section or state, edit holder names inline, revoke or restore codes,
 open a code's scan history (and undo single scans) and import names from a sheet.
 
+**Scan log:** event admins get a searchable log of every scan (who, when, which
+code, result, voided scans struck through), filterable by result and event day,
+with an Excel export of exactly what is filtered (`GET /api/events/:id/scans.xlsx`).
+
 **Account switcher:** the area at the bottom of the sidebar lets several
 accounts be logged in at once ("Add account") and switched between with a
 click. Each account keeps its own session (bearer token).

@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { el, currentEvent } from '../app.js';
 import { t, dateLocale } from '../i18n.js';
 import { barHeights } from '../bars.js';
+import { formatInZone } from '../time-format.js';
 
 const CHART_PX = 64;
 const HOUR_MS = 3_600_000;
@@ -29,14 +30,7 @@ export async function renderHistory(content) {
   content.replaceChildren(...data.days.map(day => dayCard(day, zone)));
 }
 
-/** Formats an instant on the wall clock of the event's zone (falls back to the browser's zone). */
-function format(ms, options, zone) {
-  try {
-    return new Date(ms).toLocaleString(dateLocale(), { ...options, timeZone: zone });
-  } catch {
-    return new Date(ms).toLocaleString(dateLocale(), options);
-  }
-}
+const format = (ms, options, zone) => formatInZone(ms, options, zone, dateLocale());
 
 function dayCard(day, zone) {
   const time = { hour: '2-digit', minute: '2-digit' };
