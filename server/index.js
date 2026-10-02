@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db, seedOwner } from './db.js';
 import { runMigrations } from './migrate.js';
-import { sessionMiddleware } from './auth.js';
+import { sessionMiddleware, purgeExpiredSessions } from './auth.js';
 import { HttpError, errorHandler } from './errors.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
@@ -94,6 +94,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`  Passwort: ${seeded.password}`);
     console.log('==============================================');
   }
+  purgeExpiredSessions();
+  setInterval(purgeExpiredSessions, 60 * 60 * 1000).unref();
   const { port, host } = resolveListen();
   createApp().listen(port, host, () => {
     console.log(`Tessera is running on http://${host || 'localhost'}:${port}`);

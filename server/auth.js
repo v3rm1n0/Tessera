@@ -2,7 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { db, verifyPassword, hashPassword, getEvent } from './db.js';
 import { HttpError } from './errors.js';
 
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+/** A session expires after this much inactivity; using it with less than half left starts the period over. */
+export const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+const SLIDE_BELOW_MS = SESSION_TTL_MS / 2;
 const COOKIE = 'tessera_session';
 
 // a real hash to verify against when the username is unknown, so a missing
@@ -25,6 +27,10 @@ export function readCookie(header, name) {
   return undefined;
 }
 
+function sessionCookie(token) {
+  return `${COOKIE}=${token}; HttpOnly;${SECURE} SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`;
+}
+
 /** Attaches req.user for a valid session. Sources, in order: bearer header, session cookie. */
 export function sessionMiddleware(req, res, next) {
   const bearer = (req.headers.authorization || '').match(/^Bearer (\w+)$/)?.[1];
@@ -36,9 +42,16 @@ export function sessionMiddleware(req, res, next) {
       WHERE s.token = ?
     `).get(token);
     if (row) {
-      if (row.expires_at > Date.now()) {
+      const now = Date.now();
+      if (row.expires_at > now) {
         req.user = { id: row.id, username: row.username, role: row.role };
         req.sessionToken = row.token;
+        if (row.expires_at - now < SLIDE_BELOW_MS) {
+          db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').run(now + SESSION_TTL_MS, token);
+          // keep a cookie-based browser session alive too; bearer clients (the account switcher) keep
+          // their own token and must not have the shared cookie swapped under them
+          if (!bearer) res.setHeader('Set-Cookie', sessionCookie(token));
+        }
       } else {
         db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
       }
@@ -51,9 +64,13 @@ export function login(res, userId) {
   const token = randomBytes(32).toString('hex');
   db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)')
     .run(token, userId, Date.now() + SESSION_TTL_MS);
-  res.setHeader('Set-Cookie',
-    `${COOKIE}=${token}; HttpOnly;${SECURE} SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
+  res.setHeader('Set-Cookie', sessionCookie(token));
   return token;
+}
+
+/** Deletes expired session rows (they are otherwise only removed when someone presents them); returns how many. */
+export function purgeExpiredSessions(now = Date.now()) {
+  return Number(db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now).changes);
 }
 
 export function logout(req, res) {
