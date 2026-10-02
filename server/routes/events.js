@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
+import { audit } from '../audit.js';
 import { HttpError } from '../errors.js';
 import { uniqueSheetName } from '../xlsx.js';
 import { requireName } from '../validate.js';
@@ -17,6 +18,7 @@ eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) =>
     throw new HttpError(400, 'RESET_TIME_INVALID');
   }
   db.prepare('UPDATE events SET reset_time = ? WHERE id = ?').run(resetTime, req.event.id);
+  audit(req, 'event.settings', { eventId: req.event.id, target: req.event.name, details: { reset_time: resetTime } });
   res.json({ ...req.event, reset_time: resetTime });
 });
 
@@ -32,6 +34,7 @@ eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req,
   try {
     const info = db.prepare('INSERT INTO sections (event_id, name, color) VALUES (?, ?, ?)')
       .run(req.event.id, name, color);
+    audit(req, 'section.create', { eventId: req.event.id, target: name });
     res.status(201).json({ id: Number(info.lastInsertRowid), event_id: req.event.id, name, color });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
@@ -53,7 +56,9 @@ eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, (req, r
 });
 
 eventsRouter.delete('/sections/:sectionId', manage, requireSectionAccess, (req, res) => {
+  const tickets = db.prepare('SELECT COUNT(*) AS n FROM tickets WHERE section_id = ?').get(req.section.id).n;
   db.prepare('DELETE FROM sections WHERE id = ?').run(req.section.id);
+  audit(req, 'section.delete', { eventId: req.event.id, target: req.section.name, details: { tickets } });
   res.json({ ok: true });
 });
 
@@ -62,6 +67,7 @@ eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAcce
   try {
     const info = db.prepare('INSERT INTO subsections (section_id, name) VALUES (?, ?)')
       .run(req.section.id, name);
+    audit(req, 'subsection.create', { eventId: req.event.id, target: name, details: { section: req.section.name } });
     res.status(201).json({ id: Number(info.lastInsertRowid), section_id: req.section.id, name });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
@@ -78,7 +84,7 @@ eventsRouter.get('/sections/:sectionId/subsections', manage, requireSectionAcces
 
 eventsRouter.delete('/subsections/:id', manage, (req, res) => {
   const sub = db.prepare(`
-    SELECT sub.id, s.event_id FROM subsections sub
+    SELECT sub.id, sub.name, s.name AS section, s.event_id FROM subsections sub
     JOIN sections s ON s.id = sub.section_id WHERE sub.id = ?
   `).get(Number(req.params.id));
   if (!sub) throw new HttpError(404, 'SUBSECTION_NOT_FOUND');
@@ -90,6 +96,9 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
     const { changes } = db.prepare('DELETE FROM tickets WHERE subsection_id = ?').run(sub.id);
     db.prepare('DELETE FROM subsections WHERE id = ?').run(sub.id);
     db.exec('COMMIT');
+    audit(req, 'subsection.delete', {
+      eventId: sub.event_id, target: sub.name, details: { section: sub.section, tickets: Number(changes) },
+    });
     res.json({ ok: true, deleted_tickets: Number(changes) });
   } catch (e) {
     db.exec('ROLLBACK');
@@ -103,11 +112,13 @@ eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, 
     throw new HttpError(400, 'COUNT_INVALID');
   }
   let subsectionId = null;
+  let subsectionName = null;
   if (req.body?.subsection_id != null) {
-    const sub = db.prepare('SELECT id FROM subsections WHERE id = ? AND section_id = ?')
+    const sub = db.prepare('SELECT id, name FROM subsections WHERE id = ? AND section_id = ?')
       .get(Number(req.body.subsection_id), req.section.id);
     if (!sub) throw new HttpError(400, 'SUBSECTION_MISMATCH');
     subsectionId = sub.id;
+    subsectionName = sub.name;
   }
   const insert = db.prepare(
     'INSERT INTO tickets (uuid, section_id, subsection_id) VALUES (?, ?, ?)');
@@ -124,6 +135,10 @@ eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, 
     db.exec('ROLLBACK');
     throw e;
   }
+  audit(req, 'tickets.generate', {
+    eventId: req.event.id, target: req.section.name,
+    details: subsectionName ? { count, subsection: subsectionName } : { count },
+  });
   res.status(201).json({ created: count, uuids });
 });
 

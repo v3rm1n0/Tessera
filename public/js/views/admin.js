@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { activeToken } from '../session.js';
 import { el, state, currentEvent, refreshUser } from '../app.js';
-import { t } from '../i18n.js';
+import { t, hasKey, dateLocale } from '../i18n.js';
 
 /** Administration: Owner manages accounts/events/assignments; Event Admin manages sections, UUIDs and reset time. */
 export async function renderAdmin(content) {
@@ -147,7 +147,45 @@ async function ownerBlock(reload) {
     el('div', { class: 'section-head' }, el('h2', {}, t('admin.allAccounts'))),
     accountRows.length > 0
       ? el('div', { class: 'list' }, accountRows)
-      : el('div', { class: 'empty' }, t('admin.noAccountsAtAll')));
+      : el('div', { class: 'empty' }, t('admin.noAccountsAtAll')),
+    await activityBlock());
+}
+
+const AUDIT_PAGE = 25;
+
+/** Newest-first list of administrative actions with a "load more" button. */
+async function activityBlock() {
+  const list = el('div', { class: 'list' });
+  const empty = el('div', { class: 'empty', style: 'display:none' }, t('admin.noActivity'));
+  const more = el('button', { class: 'btn secondary sm', type: 'button', style: 'margin-top:10px;display:none' }, t('admin.loadMore'));
+  let next = null;
+
+  async function load() {
+    const query = `?limit=${AUDIT_PAGE}${next ? `&before=${next}` : ''}`;
+    const data = await api.get(`/api/admin/audit${query}`);
+    list.append(...data.items.map(auditRow));
+    next = data.next_before;
+    more.style.display = next ? '' : 'none';
+    empty.style.display = list.children.length === 0 ? '' : 'none';
+  }
+  more.addEventListener('click', () => load().catch(flash));
+  await load();
+
+  return el('div', {},
+    el('div', { class: 'section-head' }, el('h2', {}, t('admin.activity'))),
+    list, empty, more);
+}
+
+function auditRow(item) {
+  const label = hasKey(`audit.${item.action}`) ? t(`audit.${item.action}`) : item.action;
+  const details = item.details
+    ? Object.entries(item.details).map(([key, value]) => `${key}: ${value}`).join(', ')
+    : '';
+  const meta = [item.username || '—', new Date(item.at).toLocaleString(dateLocale()), details].filter(Boolean).join(' · ');
+  return el('div', { class: 'row' },
+    el('div', { class: 'grow' },
+      el('div', { class: 'title' }, item.target ? `${label} · ${item.target}` : label),
+      el('div', { class: 'muted', style: 'font-size:12.5px' }, meta)));
 }
 
 async function eventBlock(reload) {

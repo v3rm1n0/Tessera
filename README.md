@@ -104,6 +104,10 @@ Optionally (checkbox in the export) each folder is bundled with a
 "Name (recipient)" column — so section and subsection leads can tick off who
 received which UUID.
 
+**Activity log:** administrative actions (accounts, events, assignments, sections,
+subsections, code generation, deletions, event settings) are recorded with who did
+them and shown to the Owner under Administration → Activity (`GET /api/admin/audit`).
+
 **Account switcher:** the area at the bottom of the sidebar lets several
 accounts be logged in at once ("Add account") and switched between with a
 click. Each account keeps its own session (bearer token).

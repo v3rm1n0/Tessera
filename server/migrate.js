@@ -142,6 +142,26 @@ export const MIGRATIONS = [
       }
     },
   },
+
+  {
+    id: '005-audit-log',
+    up(db) {
+      // event_id deliberately has no foreign key: entries about a deleted event must survive it
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id       INTEGER PRIMARY KEY AUTOINCREMENT,
+          at       INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
+          user_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          username TEXT NOT NULL DEFAULT '',
+          event_id INTEGER,
+          action   TEXT NOT NULL,
+          target   TEXT NOT NULL DEFAULT '',
+          details  TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_log(event_id, id);
+      `);
+    },
+  },
 ];
 
 /** Applies every not-yet-applied migration in order, each in its own transaction; returns the applied ids. */

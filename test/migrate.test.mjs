@@ -14,7 +14,7 @@ test('runMigrations builds the full schema and is idempotent', () => {
   const tables = new Set(
     db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name));
   for (const t of ['users', 'sessions', 'events', 'event_assignments', 'sections',
-    'tickets', 'scans', 'subsections', 'schema_migrations']) {
+    'tickets', 'scans', 'subsections', 'audit_log', 'schema_migrations']) {
     assert.ok(tables.has(t), `missing table ${t}`);
   }
   const cols = t => db.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name);
