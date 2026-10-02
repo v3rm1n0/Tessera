@@ -6,6 +6,7 @@ import {
 import { renderLogin } from './views/login.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderSectionDetail } from './views/section.js';
+import { renderHistory } from './views/history.js';
 import { renderScanner } from './views/scanner.js';
 import { renderAdmin } from './views/admin.js';
 import { renderCardEditor } from './views/card.js';
@@ -56,6 +57,7 @@ const ROUTES = [
   { path: /^#\/dashboard$/, titleKey: 'title.dashboard', render: renderDashboard, roles: EVENT_ROLES },
   { path: /^#\/sections\/(\d+)$/, titleKey: 'title.section', render: renderSectionDetail, roles: EVENT_ROLES },
   { path: /^#\/scanner$/, titleKey: 'title.scan', render: renderScanner, bare: true, roles: EVENT_ROLES },
+  { path: /^#\/history$/, titleKey: 'title.history', render: renderHistory, roles: EVENT_ROLES },
   { path: /^#\/verwaltung$/, titleKey: 'title.admin', render: renderAdmin, roles: ['OWNER', 'EVENT_ADMIN'] },
   { path: /^#\/karte\/(\d+)$/, titleKey: 'title.card', render: renderCardEditor, roles: ['EVENT_ADMIN'] },
 ];
@@ -70,7 +72,8 @@ function navItems() {
   if (EVENT_ROLES.includes(state.user.role)) {
     items.push(
       { hash: '#/dashboard', label: t('nav.dashboard'), icon: 'dashboard' },
-      { hash: '#/scanner', label: t('nav.scan'), icon: 'scan' });
+      { hash: '#/scanner', label: t('nav.scan'), icon: 'scan' },
+      { hash: '#/history', label: t('nav.history'), icon: 'history' });
   }
   if (['OWNER', 'EVENT_ADMIN'].includes(state.user.role)) {
     items.push({ hash: '#/verwaltung', label: t('nav.admin'), icon: 'settings' });

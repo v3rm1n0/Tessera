@@ -125,6 +125,11 @@ scanned the code first.
 On the dashboard every section with subsections also shows how far each
 subsection is (scans today / codes issued).
 
+**History:** the *History* view lists every event day (from one reset time to the
+next, in the event's time zone) with its scan total, duplicates, the activity per
+section and a bar chart of entries per hour — yesterday's numbers no longer
+disappear at the reset.
+
 **Account switcher:** the area at the bottom of the sidebar lets several
 accounts be logged in at once ("Add account") and switched between with a
 click. Each account keeps its own session (bearer token).
@@ -185,6 +190,7 @@ GET    /api/events/:id/card          PUT { title, text }             (once per e
 POST/GET/DELETE /api/events/:id/card/backdrop   (image upload, raw)
 GET    /api/events/:id/card/tickets  flat list for the PNG export
 GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles   (event roles)
+GET    /api/events/:id/history       per-day totals, sections and hourly throughput (event roles)
 POST   /api/scan                     { code: "<uuid>" }              (event roles)
 ```
 

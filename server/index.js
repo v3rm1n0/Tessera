@@ -10,6 +10,7 @@ import { adminRouter } from './routes/admin.js';
 import { eventsRouter } from './routes/events.js';
 import { ticketsRouter } from './routes/tickets.js';
 import { dashboardRouter } from './routes/dashboard.js';
+import { historyRouter } from './routes/history.js';
 import { scanRouter } from './routes/scan.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,7 @@ export function createApp() {
   app.use('/api', eventsRouter);
   app.use('/api', ticketsRouter);
   app.use('/api', dashboardRouter);
+  app.use('/api', historyRouter);
   app.use('/api', scanRouter);
   // whatever is left under /api is a JSON 404, never the app shell
   app.use('/api', (req, res, next) => next(new HttpError(404, 'NOT_FOUND')));

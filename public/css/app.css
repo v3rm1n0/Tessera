@@ -213,6 +213,17 @@ button.row:hover { background: var(--color-background-card); }
   width: 12px; height: 12px; border-radius: var(--radius-full); flex-shrink: 0;
 }
 
+/* history: one card per event day with an hourly bar chart */
+.day-card { margin-bottom: var(--spacing-4); }
+.day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-3); }
+.day-head .title { font-weight: var(--font-weight-semibold); }
+.day-totals { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: var(--spacing-1); font-weight: var(--font-weight-semibold); }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 64px; margin-top: var(--spacing-3); }
+.bar-slot { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.bar { width: 100%; background: var(--color-accent); border-radius: 2px 2px 0 0; }
+.bar-axis { display: flex; gap: 2px; margin-top: var(--spacing-1); font-size: 10px; color: var(--color-text-secondary); }
+.bar-axis span { flex: 1; white-space: nowrap; }
+
 /* per-subsection progress under a dashboard row */
 .chips { display: flex; flex-wrap: wrap; gap: var(--spacing-1-5); margin-top: var(--spacing-1-5); }
 .chip {
