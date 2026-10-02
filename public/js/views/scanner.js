@@ -1,6 +1,7 @@
 import { api } from '../api.js';
-import { el } from '../app.js';
+import { el, currentEvent } from '../app.js';
 import { t, dateLocale, hasKey } from '../i18n.js';
+import { describeResult } from '../scan-result.js';
 
 const RESULT_SHOW_MS = 2200;   // how long a result overlay stays before rescanning
 const SAME_CODE_COOLDOWN_MS = 6000; // ignore re-reads of the same code in this window
@@ -68,7 +69,13 @@ export async function renderScanner(content) {
     try {
       result = await api.post('/api/scan', { code });
     } catch (err) {
-      result = { status: 'ERROR', message: err.message };
+      if (err.code === 'NETWORK') {
+        // the scan may not have reached the server: the same code must be scannable again at once
+        lastSeen.delete(code);
+        result = { status: 'OFFLINE' };
+      } else {
+        result = { status: 'ERROR', code: err.code, message: err.message };
+      }
     }
     if (!running) return;
     showResult(result);
@@ -80,29 +87,10 @@ export async function renderScanner(content) {
   let resultTimer = 0;
   function showResult(r) {
     clearTimeout(resultTimer);
-    let box;
-    if (r.status === 'OK') {
-      box = el('div', { class: 'scan-result ok' },
-        el('div', { class: 'big' }, t('scan.ok')),
-        el('div', { class: 'num' }, String(r.scan_number)),
-        el('div', { class: 'detail' }, r.section || ''),
-        el('div', { class: 'tap' }, t('scan.tap')));
-    } else if (r.status === 'DOUBLE') {
-      box = el('div', { class: 'scan-result double' },
-        el('div', { class: 'big' }, t('scan.double')),
-        el('div', { class: 'detail' }, t('scan.alreadyScanned')),
-        el('div', { class: 'uuid' }, r.uuid),
-        r.first_scanned_at
-          ? el('div', { class: 'detail' },
-              t('scan.firstScan', { time: new Date(r.first_scanned_at).toLocaleTimeString(dateLocale()) }))
-          : null,
-        el('div', { class: 'tap' }, t('scan.tap')));
-    } else {
-      box = el('div', { class: 'scan-result error' },
-        el('div', { class: 'big' }, t('scan.errorTitle')),
-        el('div', { class: 'detail' }, errorText(r)),
-        el('div', { class: 'tap' }, t('scan.tap')));
-    }
+    const d = describeResult(r, { t, hasKey, locale: dateLocale(), timeZone: currentEvent()?.timezone || undefined });
+    const box = el('div', { class: `scan-result ${d.kind}` },
+      ...d.parts.map(p => el('div', { class: p.cls }, p.text)),
+      el('div', { class: 'tap' }, t('scan.tap')));
     box.addEventListener('click', dismiss);
     overlay.replaceChildren(box);
     resultTimer = setTimeout(dismiss, RESULT_SHOW_MS);
@@ -116,15 +104,20 @@ export async function renderScanner(content) {
 
   rafId = requestAnimationFrame(loop);
 
+  // the browser knows when the device has no network at all: say so before a scan fails
+  const banner = el('div', { class: 'offline-banner', role: 'status' }, t('scan.offlineBanner'));
+  const syncBanner = () => { banner.hidden = navigator.onLine !== false; };
+  syncBanner();
+  view.append(banner);
+  window.addEventListener('online', syncBanner);
+  window.addEventListener('offline', syncBanner);
+
   return () => {
     running = false;
     cancelAnimationFrame(rafId);
     clearTimeout(resultTimer);
+    window.removeEventListener('online', syncBanner);
+    window.removeEventListener('offline', syncBanner);
     stream?.getTracks().forEach(t => t.stop());
   };
-}
-
-/** The scan error in the user's language when the server sent a known code, else its raw text. */
-function errorText(r) {
-  return r.code && hasKey(`err.${r.code}`) ? t(`err.${r.code}`) : (r.message || t('scan.invalid'));
 }

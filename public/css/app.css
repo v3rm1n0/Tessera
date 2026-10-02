@@ -385,6 +385,11 @@ label.field > span { display: block; margin-bottom: var(--spacing-1-5); }
   border: 3px solid rgba(255,255,255,0.75); border-radius: var(--radius-container);
   box-shadow: 0 0 0 100vmax var(--color-overlay);
 }
+.offline-banner {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 6;
+  padding: var(--spacing-2) var(--spacing-3); background: #3d4756; color: #fff;
+  text-align: center; font-size: var(--font-size-base);
+}
 .scan-hint {
   position: absolute; bottom: var(--spacing-7); left: 0; right: 0;
   text-align: center; color: #fff; font-size: var(--font-size-base);
@@ -401,8 +406,11 @@ label.field > span { display: block; margin-bottom: var(--spacing-1-5); }
 .scan-result.ok { background: #0f7a55; }
 .scan-result.double { background: #b3541e; }
 .scan-result.error { background: #a4283a; }
+.scan-result.revoked { background: #6d2a7a; }
+.scan-result.offline { background: #3d4756; }
 .scan-result .big { font-size: 52px; font-weight: 800; color: #fff; }
 .scan-result .num { font-size: 88px; font-weight: 800; color: #fff; line-height: 1; }
+.scan-result .holder { font-size: var(--font-size-xl); font-weight: 700; color: #fff; }
 .scan-result .detail { color: rgba(255,255,255,0.9); font-size: var(--font-size-base); }
 .scan-result .uuid {
   font-family: ui-monospace, monospace; font-size: var(--font-size-base);
