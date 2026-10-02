@@ -75,6 +75,7 @@ Environment variables:
 | `TRUST_PROXY` | off | Trust the proxy's `X-Forwarded-For` header: `loopback`, a hop count (`1`), or a subnet list. Needed behind a proxy so login throttling sees real client addresses (the unit sets `loopback`). |
 | `DATA_DIR` | `./data` | Directory of the SQLite database |
 | `OWNER_PASSWORD` | random | Password of the initial owner account (at least 8 characters) |
+| `BACKUP_DIR` | `<DATA_DIR>/backups` | Where `server/backup.js` puts database backups |
 | `NODE_ENV` | | `production` marks the session cookie `Secure` (HTTPS only) |
 
 Sessions expire after 12 hours of inactivity; using the app extends them, so a
@@ -192,6 +193,17 @@ auto-detected on first load (system color scheme resp. browser language)
 and can be switched at any time — on the login screen and in the
 account-switcher menu. Preferences are stored per browser and apply
 instantly, without a page reload.
+
+## Backups
+
+`bun run backup` (or `node server/backup.js [dir] [--keep N]`) copies the database while the
+app keeps running, as `tessera-YYYYMMDD-HHMMSS.db` (UTC) into `dir`, else `$BACKUP_DIR`, else
+`<DATA_DIR>/backups`, and keeps the newest `N` (default 14) of those files; nothing else in the
+folder is touched. The copy is one consistent snapshot even while scans are being recorded, is
+checked with `PRAGMA integrity_check` before it replaces anything, and is private (folder 0700,
+file 0600). Under systemd, `deploy/tessera-backup.timer` runs it every night at 03:30 (see the
+header of `deploy/tessera-backup.service` for installation and for restoring); copy the files off
+the machine as well, a backup on the same disk does not survive losing the disk.
 
 ## Flow
 

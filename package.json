@@ -10,6 +10,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "migrate": "node server/migrate.js",
+    "backup": "node server/backup.js",
     "test": "node --test test/*.test.mjs"
   },
   "engines": {

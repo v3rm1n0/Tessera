@@ -1,0 +1,62 @@
+# Tessera database backup — run by tessera-backup.timer (a copy of the SQLite
+# database while the app keeps running, newest 14 kept).
+#
+# Install (after deploy/tessera.service):
+#   sudo cp deploy/tessera-backup.service deploy/tessera-backup.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now tessera-backup.timer
+#
+# Backups land in /var/lib/tessera/backups (mode 0600, private to the service
+# user). Copy them off the machine too: a backup next to the database does not
+# survive losing the disk. To keep them elsewhere, set BACKUP_DIR in
+# /etc/tessera/env and add ReadWritePaths=<that folder> below.
+#
+# Restore: stop the app, put a backup in place of the database, give it back to
+# the service user, start the app. (tessera.service uses a dynamic user, so the
+# real folder is /var/lib/private/tessera.)
+#   sudo systemctl stop tessera
+#   cd /var/lib/private/tessera
+#   sudo rm -f tessera.db-wal tessera.db-shm
+#   sudo cp backups/tessera-YYYYMMDD-HHMMSS.db tessera.db
+#   sudo chown --reference=. tessera.db && sudo chmod 600 tessera.db
+#   sudo systemctl start tessera
+
+[Unit]
+Description=Tessera database backup
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/tessera
+ExecStart=/usr/bin/node server/backup.js
+Environment=DATA_DIR=/var/lib/tessera
+EnvironmentFile=-/etc/tessera/env
+
+# the same dynamic user as tessera.service (User= names it explicitly), so both
+# see the same /var/lib/tessera
+DynamicUser=yes
+User=tessera
+StateDirectory=tessera
+StateDirectoryMode=0700
+UMask=0077
+
+# hardening (a backup needs no network)
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
