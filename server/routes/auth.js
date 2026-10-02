@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { attemptLogin, login, logout, requireAuth } from '../auth.js';
-import { db } from '../db.js';
+import { db, hashPassword, verifyPassword } from '../db.js';
+import { audit } from '../audit.js';
+import { requirePassword } from '../validate.js';
 import { HttpError } from '../errors.js';
 import { createThrottle } from '../throttle.js';
 
@@ -29,6 +31,42 @@ authRouter.post('/login', (req, res) => {
   loginThrottle.succeed(req.ip, username);
   const token = login(res, user.id);
   res.json({ id: user.id, username: user.username, role: user.role, token });
+});
+
+/**
+ * Changes the signed-in user's own password. Wrong current passwords count towards the login
+ * throttle; the device that changed it stays signed in, all other sessions end.
+ */
+authRouter.post('/me/password', requireAuth, (req, res) => {
+  const { current, next } = req.body || {};
+  if (typeof current !== 'string' || !current) throw new HttpError(400, 'CREDENTIALS_REQUIRED');
+  const newPassword = requirePassword(next);
+
+  const now = Date.now();
+  const verdict = loginThrottle.check(req.ip, req.user.username, now);
+  if (verdict.blocked) {
+    res.setHeader('Retry-After', verdict.retryAfter);
+    throw new HttpError(429, 'TOO_MANY_ATTEMPTS');
+  }
+  const { password_hash: hash } = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+  if (!verifyPassword(current, hash)) {
+    loginThrottle.fail(req.ip, req.user.username, now);
+    throw new HttpError(403, 'CURRENT_PASSWORD_WRONG');
+  }
+  if (newPassword === current) throw new HttpError(400, 'PASSWORD_UNCHANGED');
+  loginThrottle.succeed(req.ip, req.user.username);
+
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.user.id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(req.user.id, req.sessionToken);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  audit(req, 'password.change', { target: req.user.username });
+  res.json({ ok: true });
 });
 
 authRouter.post('/logout', (req, res) => {

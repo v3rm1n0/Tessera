@@ -107,6 +107,11 @@ Optionally (checkbox in the export) each folder is bundled with a
 "Name (recipient)" column — so section and subsection leads can tick off who
 received which UUID.
 
+**Passwords:** every user can change their own password (account menu → *Change
+password*; other devices are signed out). The Owner can reset any account's
+password (the form suggests a generated one to hand over), and new accounts get a
+*Generate* button for the same. Passwords need at least 8 characters.
+
 **Renaming:** the Owner can rename events and event admins can rename sections and
 subsections (pencil next to the name); codes, scans and cards stay attached, and
 scan labels pick up the new name immediately.
@@ -192,6 +197,8 @@ POST   /api/login | /api/logout      GET /api/me
 POST   /api/admin/users              GET/DELETE likewise             (Owner)
 POST   /api/admin/events             POST /api/admin/events/:id/assignments
 POST   /api/admin/events/:id/users   create account + assign         (Owner)
+PATCH  /api/admin/users/:id          { password }                    (Owner) reset a password
+POST   /api/me/password              { current, next }               any user, changes own password
 PATCH  /api/admin/events/:id         { name }                        (Owner) rename
 PATCH  /api/events/:id               { reset_time: "HH:MM" }         (Event Admin)
 POST   /api/events/:id/sections      { name, color? }

@@ -4,7 +4,7 @@ import { requireRole } from '../auth.js';
 import { audit, listAudit } from '../audit.js';
 import { HttpError } from '../errors.js';
 import { serverTimeZone } from '../time.js';
-import { requireName, requireNewAccount } from '../validate.js';
+import { requireName, requireNewAccount, requirePassword } from '../validate.js';
 
 /** Owner-only administration: accounts, events, assignments. */
 export const adminRouter = Router();
@@ -33,6 +33,25 @@ adminRouter.post('/users', (req, res) => {
     }
     throw e;
   }
+});
+
+/** Sets a new password for an account (the Owner hands it over); the account is signed out everywhere. */
+adminRouter.patch('/users/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const user = db.prepare("SELECT id, username FROM users WHERE id = ? AND role != 'OWNER'").get(id);
+  if (!user) throw new HttpError(404, 'USER_NOT_FOUND');
+  const password = requirePassword(req.body?.password);
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  audit(req, 'user.password_reset', { target: user.username });
+  res.json({ ok: true });
 });
 
 adminRouter.delete('/users/:id', (req, res) => {

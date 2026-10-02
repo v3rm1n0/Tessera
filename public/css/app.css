@@ -237,6 +237,12 @@ button.row:hover { background: var(--color-background-card); }
   .scan-line { grid-template-columns: 1fr 1fr; }
 }
 
+/* account rows with an expandable password reset */
+.row-wrap { background: var(--color-background-surface); border-bottom: 1px solid var(--color-border); }
+.row-wrap:last-child { border-bottom: none; }
+.row-wrap > .row { border-bottom: none; }
+.reset-panel { padding: 0 var(--spacing-4) var(--spacing-4); }
+
 /* inline rename */
 .editable { display: flex; align-items: center; gap: var(--spacing-1-5); min-width: 0; }
 .editable-form { flex: 1; }

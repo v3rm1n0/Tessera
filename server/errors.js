@@ -16,6 +16,8 @@ export const CODES = {
   USERNAME_INVALID: 'Username must be 1-64 characters without control characters',
   PASSWORD_TOO_SHORT: 'Password must be at least 8 characters',
   PASSWORD_TOO_LONG: 'Password must be at most 256 characters',
+  CURRENT_PASSWORD_WRONG: 'The current password is wrong',
+  PASSWORD_UNCHANGED: 'The new password must differ from the current one',
   NAME_REQUIRED: 'Name is required',
   NAME_TOO_LONG: 'Name must be at most 100 characters',
   ROLE_INVALID: 'Role must be EVENT_ADMIN or SCANNER',

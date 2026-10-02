@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { downloadFile } from '../download.js';
-import { editableName } from '../ui.js';
+import { editableName, passwordInput } from '../ui.js';
+import { generatePassword } from '../password.js';
 import { el, state, currentEvent, refreshUser } from '../app.js';
 import { t, hasKey, dateLocale } from '../i18n.js';
 
@@ -66,12 +67,12 @@ async function ownerBlock(reload) {
     });
 
     const nName = el('input', { type: 'text', placeholder: t('admin.usernamePh'), autocomplete: 'off' });
-    const nPass = el('input', { type: 'password', placeholder: t('admin.passwordPh'), autocomplete: 'new-password' });
+    const { input: nPass, generate: nGenerate } = passwordInput({ placeholder: t('admin.passwordPh') });
     const nRole = el('select', { style: 'width:auto' },
       el('option', { value: 'SCANNER' }, t('role.SCANNER')),
       el('option', { value: 'EVENT_ADMIN' }, t('role.EVENT_ADMIN')));
     const createForm = el('form', { class: 'inline-form', style: 'flex-wrap:wrap' },
-      nName, nPass, nRole,
+      nName, nPass, nGenerate, nRole,
       el('button', { class: 'btn sm', type: 'submit' }, t('admin.addAccount')));
     createForm.addEventListener('submit', async e => {
       e.preventDefault();
@@ -120,7 +121,14 @@ async function ownerBlock(reload) {
       unassigned.length > 0 ? el('div', { style: 'margin-top:8px' }, addExisting) : null);
   });
 
-  const accountRows = accounts.map(u =>
+  const accountRows = accounts.map(u => {
+    const panel = el('div', { style: 'display:none' });
+    const toggleReset = () => {
+      const open = panel.style.display !== 'none';
+      panel.style.display = open ? 'none' : 'block';
+      if (!open) panel.replaceChildren(resetPanel(u));
+    };
+    return el('div', { class: 'row-wrap' },
     el('div', { class: 'row' },
       el('div', { class: 'grow' },
         el('div', { class: 'title' }, u.username),
@@ -128,13 +136,16 @@ async function ownerBlock(reload) {
           `${u.role === 'EVENT_ADMIN' ? t('role.EVENT_ADMIN') : t('role.SCANNER')} · ${
             u.event_ids.length === 0 ? t('admin.noEventsAssigned')
               : u.event_ids.map(id => events.find(e => e.id === id)?.name || id).join(', ')}`)),
+      el('button', { class: 'btn secondary sm', type: 'button', onclick: toggleReset }, t('admin.resetPassword')),
       el('button', {
         class: 'btn danger sm',
         onclick: async () => {
           if (!confirm(t('admin.confirmDeleteAccount', { user: u.username }))) return;
           try { await api.del(`/api/admin/users/${u.id}`); reload(); } catch (err) { flash(err); }
         },
-      }, t('common.delete'))));
+      }, t('common.delete'))),
+    panel);
+  });
 
   return el('div', {},
     el('div', { class: 'section-head' }, el('h2', {}, t('admin.eventsHead'))),
@@ -147,6 +158,34 @@ async function ownerBlock(reload) {
       ? el('div', { class: 'list' }, accountRows)
       : el('div', { class: 'empty' }, t('admin.noAccountsAtAll')),
     await activityBlock());
+}
+
+/** Inline form of an account row: a generated password (editable) the Owner saves and hands over. */
+function resetPanel(user) {
+  const { input, generate } = passwordInput({ placeholder: t('admin.newPasswordFor', { user: user.username }) });
+  input.type = 'text';
+  input.value = generatePassword();
+  const save = el('button', { class: 'btn sm', type: 'submit' }, t('common.save'));
+  const copy = el('button', { class: 'btn secondary sm', type: 'button' }, t('admin.copy'));
+  const note = el('div', { class: 'muted', style: 'font-size:12.5px;margin-top:6px' });
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(input.value); copy.textContent = t('admin.copied'); }
+    catch { input.select(); }
+  });
+  const form = el('form', { class: 'inline-form', style: 'flex-wrap:wrap' }, input, generate, copy, save);
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    save.disabled = true;
+    try {
+      await api.patch(`/api/admin/users/${user.id}`, { password: input.value });
+      note.className = 'muted';
+      note.textContent = t('admin.passwordReset', { user: user.username });
+    } catch (err) {
+      save.disabled = false;
+      flash(err);
+    }
+  });
+  return el('div', { class: 'reset-panel' }, form, note);
 }
 
 const AUDIT_PAGE = 25;

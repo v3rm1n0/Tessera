@@ -1,6 +1,7 @@
 import { el } from './app.js';
 import { icon } from './icons.js';
 import { t } from './i18n.js';
+import { generatePassword } from './password.js';
 
 /**
  * A name with a pencil button: clicking it swaps the name for a text field (Enter or Save stores,
@@ -43,4 +44,17 @@ export function editableName({ tag = 'div', attrs = {}, name, onSave, label = t(
     input.select();
   });
   return wrap;
+}
+
+/** A password input plus a button that fills it with a generated password and shows it, so it can be handed over. */
+export function passwordInput({ placeholder, label = t('admin.generatePassword') } = {}) {
+  const input = el('input', { type: 'password', placeholder, autocomplete: 'new-password' });
+  const generate = el('button', { class: 'btn secondary sm', type: 'button', title: label }, t('admin.generate'));
+  generate.addEventListener('click', () => {
+    input.type = 'text';
+    input.value = generatePassword();
+    input.focus();
+    input.select();
+  });
+  return { input, generate };
 }

@@ -9,6 +9,7 @@ import { renderSectionDetail } from './views/section.js';
 import { renderHistory } from './views/history.js';
 import { renderCodes } from './views/codes.js';
 import { renderLog } from './views/log.js';
+import { renderAccount } from './views/account.js';
 import { renderScanner } from './views/scanner.js';
 import { renderAdmin } from './views/admin.js';
 import { renderCardEditor } from './views/card.js';
@@ -62,6 +63,7 @@ const ROUTES = [
   { path: /^#\/history$/, titleKey: 'title.history', render: renderHistory, roles: EVENT_ROLES },
   { path: /^#\/codes$/, titleKey: 'title.codes', render: renderCodes, roles: ['EVENT_ADMIN'] },
   { path: /^#\/log$/, titleKey: 'title.log', render: renderLog, roles: ['EVENT_ADMIN'] },
+  { path: /^#\/account$/, titleKey: 'title.account', render: renderAccount, roles: ['OWNER', 'EVENT_ADMIN', 'SCANNER'] },
   { path: /^#\/verwaltung$/, titleKey: 'title.admin', render: renderAdmin, roles: ['OWNER', 'EVENT_ADMIN'] },
   { path: /^#\/karte\/(\d+)$/, titleKey: 'title.card', render: renderCardEditor, roles: ['EVENT_ADMIN'] },
 ];
@@ -160,6 +162,10 @@ function accountSwitcher() {
         return item;
       }),
       el('div', { class: 'account-sep' }),
+      el('button', {
+        class: 'account-item',
+        onclick: () => { menu.style.display = 'none'; location.hash = '#/account'; },
+      }, el('span', { class: 'avatar' }, icon('settings', 'icon')), t('account.changePassword')),
       el('button', {
         class: 'account-item',
         onclick: () => { state.addingAccount = true; route(); },
