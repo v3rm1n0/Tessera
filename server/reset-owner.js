@@ -5,14 +5,15 @@
  */
 import { db, hashPassword, randomPassword } from './db.js';
 import { runMigrations } from './migrate.js';
+import { MIN_PASSWORD } from './validate.js';
 
 // ensure the schema exists; the server does this on boot, but this script
 // may run first on a fresh install (idempotent — a no-op once migrated)
 runMigrations(db);
 
 const password = process.argv[2] || randomPassword();
-if (password.length < 6) {
-  console.error('Passwort muss mindestens 6 Zeichen haben.');
+if (password.length < MIN_PASSWORD) {
+  console.error(`Password must be at least ${MIN_PASSWORD} characters.`);
   process.exit(1);
 }
 

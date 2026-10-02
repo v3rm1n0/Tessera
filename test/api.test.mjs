@@ -61,11 +61,11 @@ test('owner can log in and create accounts + event', async () => {
   eventId = ev.data.id;
 
   assert.equal((await owner('POST', '/api/admin/users',
-    { username: 'eva', password: 'pw-eva', role: 'EVENT_ADMIN' })).status, 201);
+    { username: 'eva', password: 'pw-eva-1234', role: 'EVENT_ADMIN' })).status, 201);
   assert.equal((await owner('POST', '/api/admin/users',
-    { username: 'sam', password: 'pw-sam', role: 'SCANNER' })).status, 201);
+    { username: 'sam', password: 'pw-sam-1234', role: 'SCANNER' })).status, 201);
   assert.equal((await owner('POST', '/api/admin/users',
-    { username: 'out', password: 'pw-out', role: 'SCANNER' })).status, 201);
+    { username: 'out', password: 'pw-out-1234', role: 'SCANNER' })).status, 201);
 
   const users = (await owner('GET', '/api/admin/users')).data;
   const eva = users.find(u => u.username === 'eva');
@@ -75,9 +75,9 @@ test('owner can log in and create accounts + event', async () => {
 });
 
 test('non-owner cannot use owner endpoints', async () => {
-  await admin('POST', '/api/login', { username: 'eva', password: 'pw-eva' });
-  await scanner('POST', '/api/login', { username: 'sam', password: 'pw-sam' });
-  await outsider('POST', '/api/login', { username: 'out', password: 'pw-out' });
+  await admin('POST', '/api/login', { username: 'eva', password: 'pw-eva-1234' });
+  await scanner('POST', '/api/login', { username: 'sam', password: 'pw-sam-1234' });
+  await outsider('POST', '/api/login', { username: 'out', password: 'pw-out-1234' });
   assert.equal((await admin('POST', '/api/admin/events', { name: 'x' })).status, 403);
   assert.equal((await scanner('GET', '/api/admin/users')).status, 403);
 });
@@ -267,7 +267,7 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
   assert.deepEqual(Buffer.from(await img.arrayBuffer()), png);
   const { token } = await (await fetch(base + '/api/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'eva', password: 'pw-eva' }),
+    body: JSON.stringify({ username: 'eva', password: 'pw-eva-1234' }),
   })).json();
   assert.equal((await fetch(base + `/api/events/${eventId}/card/backdrop`,
     { headers: { Authorization: `Bearer ${token}` } })).status, 200);
@@ -335,14 +335,14 @@ test('owner creates an account directly inside an event', async () => {
 
   // duplicate username rolls back cleanly
   assert.equal((await owner('POST', `/api/admin/events/${eventId}/users`,
-    { username: 'gate1', password: 'x', role: 'SCANNER' })).status, 409);
+    { username: 'gate1', password: 'pw-gate1', role: 'SCANNER' })).status, 409);
 });
 
 test('bearer token authenticates the account switcher and downloads', async () => {
   const res = await fetch(base + '/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'eva', password: 'pw-eva' }),
+    body: JSON.stringify({ username: 'eva', password: 'pw-eva-1234' }),
   });
   const { token } = await res.json();
   assert.ok(token);

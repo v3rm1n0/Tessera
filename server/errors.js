@@ -9,6 +9,13 @@ export const CODES = {
   INVALID_REQUEST: 'Invalid request',
   UNSUPPORTED_MEDIA_TYPE: 'Unsupported media type',
   INTERNAL: 'Internal server error',
+  CREDENTIALS_REQUIRED: 'Username and password are required',
+  USERNAME_INVALID: 'Username must be 1-64 characters without control characters',
+  PASSWORD_TOO_SHORT: 'Password must be at least 8 characters',
+  PASSWORD_TOO_LONG: 'Password must be at most 256 characters',
+  NAME_REQUIRED: 'Name is required',
+  NAME_TOO_LONG: 'Name must be at most 100 characters',
+  ROLE_INVALID: 'Role must be EVENT_ADMIN or SCANNER',
 };
 
 /** Throw (or pass to next) to answer with a specific status and code. */

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { attemptLogin, login, logout, requireAuth } from '../auth.js';
 import { db } from '../db.js';
+import { HttpError } from '../errors.js';
 
 export const authRouter = Router();
 
@@ -31,8 +32,8 @@ function sweep(now) {
 
 authRouter.post('/login', (req, res) => {
   const { username, password } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
+  if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
+    throw new HttpError(400, 'CREDENTIALS_REQUIRED');
   }
   const now = Date.now();
   sweep(now);

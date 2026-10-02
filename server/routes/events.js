@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
 import { uniqueSheetName } from '../xlsx.js';
+import { requireName } from '../validate.js';
 
 /** Event Admin functionality: sections, UUIDs and QR codes are managed exclusively by the event's admins. */
 export const eventsRouter = Router();
@@ -21,8 +22,7 @@ eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) =>
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req, res) => {
-  const name = (req.body?.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'Name is required' });
+  const name = requireName(req.body?.name);
   const custom = req.body?.color;
   if (custom !== undefined && !COLOR_RE.test(custom)) {
     return res.status(400).json({ error: 'color must be in #rrggbb format' });
@@ -57,8 +57,7 @@ eventsRouter.delete('/sections/:sectionId', manage, requireSectionAccess, (req, 
 });
 
 eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAccess, (req, res) => {
-  const name = (req.body?.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'Name is required' });
+  const name = requireName(req.body?.name);
   try {
     const info = db.prepare('INSERT INTO subsections (section_id, name) VALUES (?, ?)')
       .run(req.section.id, name);

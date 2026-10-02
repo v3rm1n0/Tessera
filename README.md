@@ -24,7 +24,8 @@ NodeSource, an `/opt/tessera` checkout, a dedicated system user via
 
 On first start an **owner account** is created and its credentials are
 printed to the console (the password can be set via
-`OWNER_PASSWORD=… bun start`). The database lives in `data/tessera.db`
+`OWNER_PASSWORD=… bun start`; passwords must be at least 8 characters, which
+also applies to every account created later). The database lives in `data/tessera.db`
 (SQLite, via `node:sqlite` — no native modules required).
 
 ### Database migrations

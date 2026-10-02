@@ -126,6 +126,13 @@ export const dict = {
     'err.INVALID_REQUEST': 'Ungültige Anfrage.',
     'err.UNSUPPORTED_MEDIA_TYPE': 'Nicht unterstütztes Dateiformat.',
     'err.INTERNAL': 'Interner Serverfehler.',
+    'err.CREDENTIALS_REQUIRED': 'Benutzername und Passwort sind erforderlich.',
+    'err.USERNAME_INVALID': 'Der Benutzername muss 1–64 Zeichen lang sein und darf keine Steuerzeichen enthalten.',
+    'err.PASSWORD_TOO_SHORT': 'Das Passwort muss mindestens 8 Zeichen lang sein.',
+    'err.PASSWORD_TOO_LONG': 'Das Passwort darf höchstens 256 Zeichen lang sein.',
+    'err.NAME_REQUIRED': 'Ein Name ist erforderlich.',
+    'err.NAME_TOO_LONG': 'Der Name ist zu lang (höchstens 100 Zeichen).',
+    'err.ROLE_INVALID': 'Die Rolle muss Event-Admin oder Scanner sein.',
   },
   en: {
     brand: 'Tessera',
@@ -252,6 +259,13 @@ export const dict = {
     'err.INVALID_REQUEST': 'Invalid request.',
     'err.UNSUPPORTED_MEDIA_TYPE': 'Unsupported file type.',
     'err.INTERNAL': 'Internal server error.',
+    'err.CREDENTIALS_REQUIRED': 'Username and password are required.',
+    'err.USERNAME_INVALID': 'The username must be 1–64 characters long without control characters.',
+    'err.PASSWORD_TOO_SHORT': 'The password must be at least 8 characters long.',
+    'err.PASSWORD_TOO_LONG': 'The password must be at most 256 characters long.',
+    'err.NAME_REQUIRED': 'A name is required.',
+    'err.NAME_TOO_LONG': 'The name is too long (at most 100 characters).',
+    'err.ROLE_INVALID': 'The role must be Event Admin or Scanner.',
   },
 };
 

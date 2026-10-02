@@ -3,6 +3,7 @@ import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { MIN_PASSWORD } from './validate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -70,7 +71,11 @@ export function eventBoundary(eventId) {
 export function seedOwner() {
   const existing = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'OWNER'").get();
   if (existing.n > 0) return null;
-  const password = process.env.OWNER_PASSWORD || randomPassword();
+  const configured = process.env.OWNER_PASSWORD;
+  if (configured && configured.length < MIN_PASSWORD) {
+    throw new Error(`OWNER_PASSWORD must be at least ${MIN_PASSWORD} characters`);
+  }
+  const password = configured || randomPassword();
   db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
     .run('owner', hashPassword(password), 'OWNER');
   return { username: 'owner', password };

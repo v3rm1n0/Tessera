@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db, hashPassword } from '../db.js';
 import { requireRole } from '../auth.js';
+import { requireName, requireNewAccount } from '../validate.js';
 
 /** Owner-only administration: accounts, events, assignments. */
 export const adminRouter = Router();
@@ -17,17 +18,11 @@ adminRouter.get('/users', (req, res) => {
 });
 
 adminRouter.post('/users', (req, res) => {
-  const { username, password, role } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-  if (!['EVENT_ADMIN', 'SCANNER'].includes(role)) {
-    return res.status(400).json({ error: 'Role must be EVENT_ADMIN or SCANNER' });
-  }
+  const { username, password, role } = requireNewAccount(req.body);
   try {
     const info = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
-      .run(username.trim(), hashPassword(password), role);
-    res.status(201).json({ id: Number(info.lastInsertRowid), username: username.trim(), role });
+      .run(username, hashPassword(password), role);
+    res.status(201).json({ id: Number(info.lastInsertRowid), username, role });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
       return res.status(409).json({ error: 'Username already taken' });
@@ -45,8 +40,7 @@ adminRouter.delete('/users/:id', (req, res) => {
 });
 
 adminRouter.post('/events', (req, res) => {
-  const name = (req.body?.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'Name is required' });
+  const name = requireName(req.body?.name);
   const info = db.prepare('INSERT INTO events (name) VALUES (?)').run(name);
   res.status(201).json({ id: Number(info.lastInsertRowid), name, reset_time: '00:00' });
 });
@@ -66,21 +60,15 @@ adminRouter.post('/events/:id/users', (req, res) => {
   const eventId = Number(req.params.id);
   const event = db.prepare('SELECT id FROM events WHERE id = ?').get(eventId);
   if (!event) return res.status(404).json({ error: 'Event not found' });
-  const { username, password, role } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-  if (!['EVENT_ADMIN', 'SCANNER'].includes(role)) {
-    return res.status(400).json({ error: 'Role must be EVENT_ADMIN or SCANNER' });
-  }
+  const { username, password, role } = requireNewAccount(req.body);
   db.exec('BEGIN');
   try {
     const info = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
-      .run(username.trim(), hashPassword(password), role);
+      .run(username, hashPassword(password), role);
     db.prepare('INSERT INTO event_assignments (user_id, event_id) VALUES (?, ?)')
       .run(Number(info.lastInsertRowid), eventId);
     db.exec('COMMIT');
-    res.status(201).json({ id: Number(info.lastInsertRowid), username: username.trim(), role });
+    res.status(201).json({ id: Number(info.lastInsertRowid), username, role });
   } catch (e) {
     db.exec('ROLLBACK');
     if (String(e.message).includes('UNIQUE')) {
