@@ -13,6 +13,7 @@ import { renderAccount } from './views/account.js';
 import { renderScanner } from './views/scanner.js';
 import { renderAdmin } from './views/admin.js';
 import { renderCardEditor } from './views/card.js';
+import { createViewHost } from './view-host.js';
 import { initTheme } from './theme.js';
 import { t, initI18n } from './i18n.js';
 import { renderSettingsControls } from './settings.js';
@@ -52,7 +53,7 @@ export function el(tag, attrs = {}, ...children) {
 }
 
 const app = document.getElementById('app');
-let cleanup = null; // view teardown (e.g. stop the camera)
+const views = createViewHost(); // tears views down (e.g. stops the camera), even ones that finish late
 
 const EVENT_ROLES = ['EVENT_ADMIN', 'SCANNER'];
 
@@ -220,8 +221,7 @@ function sessionExpired() {
 setUnauthorizedHandler(sessionExpired);
 
 async function route() {
-  cleanup?.();
-  cleanup = null;
+  const mine = views.begin();
 
   if (pendingLogin) {
     const prefill = pendingLogin;
@@ -238,6 +238,7 @@ async function route() {
     try {
       await refreshUser();
     } catch (err) {
+      if (!views.isCurrent(mine)) return; // a newer navigation took over while we waited
       if (err.status === 401) {
         // the stored session expired: ask for this account's password instead of silently
         // showing a different account
@@ -247,6 +248,7 @@ async function route() {
       }
       return showLogin(false);
     }
+    if (!views.isCurrent(mine)) return;
   }
 
   const match = ROUTES.map(r => ({ r, m: location.hash.match(r.path) })).find(x => x.m);
@@ -260,7 +262,8 @@ async function route() {
     return;
   }
   const content = renderShell(t(r.titleKey), r.bare);
-  cleanup = await r.render(content, ...m.slice(1).map(Number)) || null;
+  // a view that finishes after the user already moved on is torn down right away
+  views.finish(mine, await r.render(content, ...m.slice(1).map(Number)));
 }
 
 function showLogin(cancelable, prefill = {}) {
