@@ -12,19 +12,22 @@ const DUMMY_HASH = hashPassword(randomBytes(16).toString('hex'));
 // so http://localhost keeps working
 const SECURE = process.env.NODE_ENV === 'production' ? ' Secure;' : '';
 
-function parseCookies(req) {
-  const out = {};
-  for (const part of (req.headers.cookie || '').split(';')) {
+/** Value of one cookie from a Cookie header; undefined when absent or not decodable. */
+export function readCookie(header, name) {
+  for (const part of (header || '').split(';')) {
     const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    if (i > 0 && part.slice(0, i).trim() === name) {
+      try { return decodeURIComponent(part.slice(i + 1).trim()); }
+      catch { return undefined; }
+    }
   }
-  return out;
+  return undefined;
 }
 
 /** Attaches req.user for a valid session. Sources, in order: bearer header, session cookie. */
 export function sessionMiddleware(req, res, next) {
   const bearer = (req.headers.authorization || '').match(/^Bearer (\w+)$/)?.[1];
-  const token = bearer || parseCookies(req)[COOKIE];
+  const token = bearer || readCookie(req.headers.cookie, COOKIE);
   if (token) {
     const row = db.prepare(`
       SELECT u.id, u.username, u.role, s.token, s.expires_at
