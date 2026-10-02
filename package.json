@@ -21,15 +21,17 @@
     "express": "^5.2.1"
   },
   "overrides": {
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "brace-expansion": "^2.1.7",
+    "qs": "^6.16.0"
   },
   "devDependencies": {
-    "@astryxdesign/cli": "^0.1.8",
-    "@astryxdesign/core": "^0.1.8",
-    "@astryxdesign/theme-neutral": "^0.1.8",
+    "@astryxdesign/cli": "^0.1.9",
+    "@astryxdesign/core": "^0.1.9",
+    "@astryxdesign/theme-neutral": "^0.1.9",
     "@fontsource/figtree": "^5.3.0",
     "jsqr": "^1.4.0",
-    "jszip": "^3.10.1",
+    "jszip": "^3.10.2",
     "qrcode-generator": "^2.0.4"
   },
   "trustedDependencies": [
