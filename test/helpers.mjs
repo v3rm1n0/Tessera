@@ -7,8 +7,10 @@ const REQUEST_TIMEOUT_MS = 8000;
 /**
  * Boots the app on an ephemeral port against an in-memory database.
  * `env` entries are applied before the server modules load; pass null to unset a variable.
+ * `wrap(innerApp, express)` may return an outer express app that mounts the real one, so a test
+ * can add routes of its own without touching production code.
  */
-export async function startTestApp(env = {}) {
+export async function startTestApp(env = {}, { wrap } = {}) {
   process.env.NODE_ENV = 'test';
   process.env.OWNER_PASSWORD = OWNER_PASSWORD;
   for (const [key, value] of Object.entries(env)) {
@@ -19,8 +21,10 @@ export async function startTestApp(env = {}) {
   const { createApp } = await import('../server/index.js');
   dbModule.seedOwner();
 
+  const inner = createApp();
+  const app = wrap ? wrap(inner, (await import('express')).default) : inner;
   const server = await new Promise(resolve => {
-    const s = createApp().listen(0, () => resolve(s));
+    const s = app.listen(0, () => resolve(s));
   });
   server.unref(); // let the test process exit once the tests are done
   const base = `http://localhost:${server.address().port}`;
