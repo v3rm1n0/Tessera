@@ -84,8 +84,18 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
   if (!canAccessEvent(req.user, sub.event_id)) {
     return res.status(403).json({ error: 'Not authorized for this event' });
   }
-  db.prepare('DELETE FROM subsections WHERE id = ?').run(sub.id);
-  res.json({ ok: true });
+  // the codes of a subsection go with it (their scans follow via ON DELETE CASCADE); without this
+  // they would silently turn into section-level codes under a different label
+  db.exec('BEGIN');
+  try {
+    const { changes } = db.prepare('DELETE FROM tickets WHERE subsection_id = ?').run(sub.id);
+    db.prepare('DELETE FROM subsections WHERE id = ?').run(sub.id);
+    db.exec('COMMIT');
+    res.json({ ok: true, deleted_tickets: Number(changes) });
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 });
 
 eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, (req, res) => {

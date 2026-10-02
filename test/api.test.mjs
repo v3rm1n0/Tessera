@@ -238,7 +238,7 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
   assert.equal(cfg0.status, 200);
   assert.equal(cfg0.data.event, 'Kongress 2026');
   assert.equal(cfg0.data.has_backdrop, false);
-  assert.equal(cfg0.data.total_tickets, 6); // 5 (Audio Video) + 1 (subsection ticket)
+  assert.equal(cfg0.data.total_tickets, 5); // the subsection's ticket went away with its subsection
   assert.match(cfg0.data.sample.color, /^#[0-9a-f]{6}$/i);
 
   assert.equal((await admin('PUT', `/api/events/${eventId}/card`,
@@ -249,7 +249,7 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
 
   // flat ticket list for bulk generation carries color + label parts
   const tickets = (await admin('GET', `/api/events/${eventId}/card/tickets`)).data;
-  assert.equal(tickets.length, 6);
+  assert.equal(tickets.length, 5);
   assert.ok(tickets.every(t => /^#[0-9a-f]{6}$/i.test(t.color) && t.section === 'Audio Video'));
 
   // upload raw backdrop bytes

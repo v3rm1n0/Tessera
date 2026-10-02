@@ -86,7 +86,9 @@ the admission card's main color.
 Entrance crew / Floor crew). In Administration each section appears as a
 card that contains its subsections as nested cards — each level has its own
 code counter and UUID generator. UUIDs are generated per level; the card
-label and scan feedback then show "Section – Subsection".
+label and scan feedback then show "Section – Subsection". Deleting a
+subsection deletes its codes (and their scan history) too; the confirmation
+names the number of codes.
 
 **Admission cards:** the admission card is designed **once per event** —
 background image, title and text (with `**bold**`) are freely editable. A

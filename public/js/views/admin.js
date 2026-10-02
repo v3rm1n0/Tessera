@@ -218,7 +218,7 @@ async function eventBlock(reload) {
         el('button', {
           class: 'btn danger sm', title: t('admin.deleteSub'),
           onclick: async () => {
-            if (!confirm(t('admin.confirmDeleteSub', { name: sub.name }))) return;
+            if (!confirm(t('admin.confirmDeleteSub', { name: sub.name, n: sub.ticket_count }))) return;
             try { await api.del(`/api/subsections/${sub.id}`); reload(); } catch (err) { flash(err); }
           },
         }, '✕')));
