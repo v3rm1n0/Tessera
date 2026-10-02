@@ -2,6 +2,19 @@ import { formatInZone } from './time-format.js';
 
 const CLOCK = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
 
+/** How long a scanner may take back their own scan (the server's UNDO_WINDOW_MS). */
+export const UNDO_WINDOW_MS = 60_000;
+
+/**
+ * Whether the undo offer for `lastScan` ({ scanId, at }, `at` = when the request was sent) is still
+ * open at `now`. It closes a hair before the server's window does, never after.
+ */
+export function undoActive(lastScan, now) {
+  return Boolean(lastScan?.scanId) && now - lastScan.at < UNDO_WINDOW_MS;
+}
+
+const summarize = (...bits) => bits.filter(Boolean).join(' · ');
+
 /** The error in the user's language when the server sent a known code, else its raw text. */
 function errorText(result, { t, hasKey }) {
   return result.code && hasKey(`err.${result.code}`) ? t(`err.${result.code}`) : (result.message || t('scan.invalid'));
@@ -10,8 +23,9 @@ function errorText(result, { t, hasKey }) {
 /**
  * Turns a scan response (or the client-side `{ status: 'OFFLINE' }` marker) into what the result
  * overlay shows: `kind` picks colour and haptics, `scanId` is what undoing needs (accepted scans and
- * duplicates only), `parts` are the lines top to bottom with the CSS class of each. Empty values
- * are left out, so a ticket without a holder simply has no holder line.
+ * duplicates only) and `summary` names such a scan for the undo bar, `parts` are the lines top to
+ * bottom with the CSS class of each. Empty values are left out, so a ticket without a holder simply
+ * has no holder line.
  */
 export function describeResult(result, { t, hasKey, locale, timeZone }) {
   const r = result || {};
@@ -24,7 +38,7 @@ export function describeResult(result, { t, hasKey, locale, timeZone }) {
       add('num', String(r.scan_number));
       add('holder', r.holder);
       add('detail', r.section);
-      return { kind: 'ok', scanId: r.scan_id, parts };
+      return { kind: 'ok', scanId: r.scan_id, summary: summarize(`#${r.scan_number}`, r.holder, r.section), parts };
 
     case 'DOUBLE': {
       add('big', t('scan.double'));
@@ -38,7 +52,7 @@ export function describeResult(result, { t, hasKey, locale, timeZone }) {
           ? t('scan.firstScanBy', { time, name: r.first_scanned_by })
           : t('scan.firstScan', { time }));
       }
-      return { kind: 'double', scanId: r.scan_id, parts };
+      return { kind: 'double', scanId: r.scan_id, summary: summarize(t('scan.duplicate'), r.holder, r.section), parts };
     }
 
     case 'REVOKED':

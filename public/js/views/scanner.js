@@ -2,7 +2,7 @@ import { api } from '../api.js';
 import { el, currentEvent } from '../app.js';
 import { t, dateLocale, hasKey } from '../i18n.js';
 import { icon } from '../icons.js';
-import { describeResult } from '../scan-result.js';
+import { describeResult, undoActive, UNDO_WINDOW_MS } from '../scan-result.js';
 import { torchSupported, setTorch, createWakeLock, watchCamera } from '../camera.js';
 
 const RESULT_SHOW_MS = 2200;   // how long a result overlay stays before rescanning
@@ -27,6 +27,9 @@ export async function renderScanner(content) {
     el('div', { class: 'manual-actions' },
       el('button', { type: 'button', class: 'btn secondary', onclick: () => closeManual() }, t('common.cancel')),
       el('button', { type: 'submit', class: 'btn' }, t('scan.manualSubmit'))));
+  const undoText = el('span', { class: 'undo-text' });
+  const undoButton = el('button', { type: 'button', class: 'btn sm', onclick: () => undoLast() }, t('scan.undo'));
+  const undoBar = el('div', { class: 'undo-bar', role: 'status', hidden: '' }, undoText, undoButton);
   const cameraError = el('div', { class: 'camera-error', hidden: '' },
     el('div', {},
       el('p', {}, t('scan.noCamera')),
@@ -39,6 +42,7 @@ export async function renderScanner(content) {
     torchButton,
     manualButton,
     manualPanel,
+    undoBar,
     overlay,
     cameraError);
   content.replaceChildren(view);
@@ -133,6 +137,63 @@ export async function renderScanner(content) {
     submitCode(code);
   });
 
+  let lastScan = null;   // { scanId, key, at, summary } of the latest recorded scan, which the undo bar can take back
+  let undoTimer = 0;
+  let undoBusy = false;
+
+  /** Shows the offer to undo the last scan while it is open, hides the bar when it closes. */
+  function renderUndoBar() {
+    clearTimeout(undoTimer);
+    if (!undoActive(lastScan, Date.now())) {
+      lastScan = null;
+      undoBar.hidden = true;
+      return;
+    }
+    undoText.textContent = t('scan.lastScan', { what: lastScan.summary });
+    undoButton.hidden = false;
+    undoButton.disabled = false;
+    undoBar.classList.remove('note');
+    undoBar.hidden = false;
+    undoTimer = setTimeout(renderUndoBar, UNDO_WINDOW_MS - (Date.now() - lastScan.at));
+  }
+
+  /** A short message in place of the offer; afterwards the offer returns if it is still open. */
+  function noteInUndoBar(text) {
+    clearTimeout(undoTimer);
+    undoText.textContent = text;
+    undoButton.hidden = true;
+    undoBar.classList.add('note');
+    undoBar.hidden = false;
+    undoTimer = setTimeout(renderUndoBar, 3000);
+  }
+
+  async function undoLast() {
+    const last = lastScan;
+    if (!last || undoBusy) return;
+    if (!undoActive(last, Date.now())) return renderUndoBar();
+    undoBusy = true;
+    undoButton.disabled = true;
+    try {
+      await api.post(`/api/scans/${last.scanId}/void`);
+      lastSeen.delete(last.key); // the same code may be scanned again right away
+      lastScan = null;
+      noteInUndoBar(t('scan.undone'));
+    } catch (err) {
+      if (err.code !== 'NETWORK') lastScan = null; // refused for good: the offer ends with the message
+      noteInUndoBar(err.message);
+    } finally {
+      undoBusy = false;
+    }
+  }
+
+  /** Only a recorded scan can be taken back; any other result (or a new scan) ends the previous offer. */
+  function rememberScan(described, key, sentAt) {
+    lastScan = described.scanId
+      ? { scanId: described.scanId, key, summary: described.summary, at: lastScan?.scanId === described.scanId ? lastScan.at : sentAt }
+      : null;
+    renderUndoBar();
+  }
+
   function loop(ts) {
     if (!running) return;
     rafId = requestAnimationFrame(loop);
@@ -159,6 +220,7 @@ export async function renderScanner(content) {
   /** Sends a scanned or typed code (a whole uuid or the short code of a card) and shows the result. */
   async function submitCode(code) {
     paused = true;
+    const sentAt = Date.now(); // the undo window counts from here, never later than the server's
 
     let result;
     try {
@@ -173,7 +235,7 @@ export async function renderScanner(content) {
       }
     }
     if (!running) return;
-    showResult(result);
+    rememberScan(showResult(result), code, sentAt);
     if (navigator.vibrate) {
       navigator.vibrate(result.status === 'OK' ? 80 : [80, 60, 80]);
     }
@@ -189,6 +251,7 @@ export async function renderScanner(content) {
     box.addEventListener('click', dismiss);
     overlay.replaceChildren(box);
     resultTimer = setTimeout(dismiss, RESULT_SHOW_MS);
+    return d;
   }
 
   function dismiss() {
@@ -212,6 +275,7 @@ export async function renderScanner(content) {
     running = false;
     cancelAnimationFrame(rafId);
     clearTimeout(resultTimer);
+    clearTimeout(undoTimer);
     window.removeEventListener('online', syncBanner);
     window.removeEventListener('offline', syncBanner);
     releaseCamera();

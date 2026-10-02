@@ -1,8 +1,9 @@
+import './env.mjs';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
-const { describeResult } = await import('../public/js/scan-result.js');
+const { describeResult, undoActive, UNDO_WINDOW_MS } = await import('../public/js/scan-result.js');
 const { t, hasKey, setLang } = await import('../public/js/i18n.js');
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -82,4 +83,45 @@ test('the result follows the interface language', () => {
   assert.equal(describe({ status: 'OFFLINE' }).parts[0].text, 'Keine Verbindung');
   const first = describe({ status: 'DOUBLE', uuid: UUID, section: 'S', first_scanned_at: Date.UTC(2026, 6, 21, 10, 3, 5), first_scanned_by: 'gate-2' });
   assert.match(first.parts.at(-1).text, /Erster Scan: 12:03:05 Uhr von gate-2/);
+});
+
+test('only accepted scans and duplicates can be undone', () => {
+  assert.equal(describe({ status: 'OK', scan_number: 1, scan_id: 5 }).scanId, 5);
+  assert.equal(describe({ status: 'DOUBLE', uuid: UUID, scan_id: 6 }).scanId, 6);
+  for (const result of [
+    { status: 'ERROR', code: 'UNKNOWN_CODE', scan_id: 9 },
+    { status: 'REVOKED', uuid: UUID, scan_id: 9 },
+    { status: 'OFFLINE' },
+  ]) {
+    assert.equal(describe(result).scanId, undefined, result.status);
+  }
+});
+
+test('the summary names the scan for the undo bar', () => {
+  assert.equal(describe({ status: 'OK', scan_number: 12, section: 'Audio Video', holder: 'Anna Audio', scan_id: 1 }).summary, '#12 · Anna Audio · Audio Video');
+  assert.equal(describe({ status: 'OK', scan_number: 3, section: 'Audio Video', scan_id: 1 }).summary, '#3 · Audio Video');
+  assert.equal(describe({ status: 'DOUBLE', uuid: UUID, section: 'Audio Video', holder: 'Anna Audio', scan_id: 2 }).summary, 'Duplicate · Anna Audio · Audio Video');
+  assert.equal(describe({ status: 'ERROR', code: 'UNKNOWN_CODE' }).summary, undefined);
+  setLang('de');
+  assert.equal(describe({ status: 'DOUBLE', uuid: UUID, section: 'S', scan_id: 2 }).summary, 'Duplikat · S');
+});
+
+test('the undo offer lasts one minute, counted from when the scan was sent', () => {
+  const last = { scanId: 7, at: 1_000_000 };
+  assert.equal(UNDO_WINDOW_MS, 60_000);
+  assert.equal(undoActive(last, 1_000_000), true);
+  assert.equal(undoActive(last, 1_000_000 + 59_999), true);
+  assert.equal(undoActive(last, 1_000_000 + 60_000), false, 'a hair before the server, which allows exactly 60 s');
+  assert.equal(undoActive(last, 1_000_000 + 3_600_000), false);
+});
+
+test('without a recorded scan there is nothing to undo', () => {
+  assert.equal(undoActive(null, 1), false);
+  assert.equal(undoActive(undefined, 1), false);
+  assert.equal(undoActive({ at: 1 }, 2), false, 'no scan id');
+});
+
+test("the client's undo window is the server's", async () => {
+  const { UNDO_WINDOW_MS: serverWindow } = await import('../server/routes/scan.js');
+  assert.equal(UNDO_WINDOW_MS, serverWindow);
 });
