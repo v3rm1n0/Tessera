@@ -38,9 +38,29 @@ function securityHeaders(req, res, next) {
   next();
 }
 
+/**
+ * TRUST_PROXY takes what Express's "trust proxy" setting takes: true/false, a hop count, or a
+ * subnet list such as "loopback, 10.0.0.0/8". Unset leaves proxies untrusted.
+ */
+export function parseTrustProxy(value) {
+  const v = String(value ?? '').trim();
+  if (v === '') return undefined;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  if (/^\d+$/.test(v)) return Number(v);
+  return v;
+}
+
+/** PORT (default 3000) and HOST (default: all interfaces). */
+export function resolveListen(env = process.env) {
+  return { port: Number(env.PORT || 3000), host: env.HOST || undefined };
+}
+
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+  if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   app.use(securityHeaders);
   app.use(express.json({ limit: '1mb' }));
   app.use(sessionMiddleware);
@@ -74,9 +94,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`  Passwort: ${seeded.password}`);
     console.log('==============================================');
   }
-  const port = Number(process.env.PORT || 3000);
-  createApp().listen(port, () => {
-    console.log(`Tessera is running on http://localhost:${port}`);
+  const { port, host } = resolveListen();
+  createApp().listen(port, host, () => {
+    console.log(`Tessera is running on http://${host || 'localhost'}:${port}`);
     console.log('Note: Camera access in browser requires HTTPS or localhost.');
   });
 }

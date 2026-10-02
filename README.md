@@ -47,6 +47,19 @@ database (existing structures are skipped).
 > For scanner phones on the LAN, put a TLS reverse proxy (e.g. Caddy) in
 > front, or use a tunnel.
 
+## Configuration
+
+Environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | TCP port |
+| `HOST` | all interfaces | Bind address. Set `127.0.0.1` when a reverse proxy on the same machine is the only entry point (the shipped systemd unit does). |
+| `TRUST_PROXY` | off | Trust the proxy's `X-Forwarded-For` header: `loopback`, a hop count (`1`), or a subnet list. Needed behind a proxy so login throttling sees real client addresses (the unit sets `loopback`). |
+| `DATA_DIR` | `./data` | Directory of the SQLite database |
+| `OWNER_PASSWORD` | random | Password of the initial owner account (at least 8 characters) |
+| `NODE_ENV` | | `production` marks the session cookie `Secure` (HTTPS only) |
+
 ## Roles
 
 | Role | Permissions |

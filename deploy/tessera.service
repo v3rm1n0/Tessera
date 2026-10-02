@@ -44,6 +44,11 @@ ExecStartPre=/usr/bin/node server/migrate.js
 ExecStart=/usr/bin/node server/index.js
 Environment=NODE_ENV=production
 Environment=PORT=3000
+# listen on loopback only: the TLS reverse proxy on this machine is the public entry point.
+# Remove HOST (or set 0.0.0.0) if the proxy runs on another machine.
+Environment=HOST=127.0.0.1
+# trust the proxy's X-Forwarded-For header so login throttling sees real client addresses
+Environment=TRUST_PROXY=loopback
 Environment=DATA_DIR=/var/lib/tessera
 EnvironmentFile=-/etc/tessera/env
 
