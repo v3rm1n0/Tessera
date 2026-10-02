@@ -10,6 +10,8 @@ export const CODES = {
   UNSUPPORTED_MEDIA_TYPE: 'Unsupported media type',
   INTERNAL: 'Internal server error',
   NOT_FOUND: 'Not found',
+  INVALID_CREDENTIALS: 'Invalid credentials',
+  TOO_MANY_ATTEMPTS: 'Too many attempts, please try again later',
   CREDENTIALS_REQUIRED: 'Username and password are required',
   USERNAME_INVALID: 'Username must be 1-64 characters without control characters',
   PASSWORD_TOO_SHORT: 'Password must be at least 8 characters',

@@ -60,6 +60,11 @@ Environment variables:
 | `OWNER_PASSWORD` | random | Password of the initial owner account (at least 8 characters) |
 | `NODE_ENV` | | `production` marks the session cookie `Secure` (HTTPS only) |
 
+Failed logins are throttled for 15 minutes: 8 failures per client address and
+username, with higher backstops of 40 per username (any address) and 200 per
+address (any username), so one mistyped password or one busy venue network
+cannot lock everybody out.
+
 ## Roles
 
 | Role | Permissions |
