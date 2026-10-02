@@ -79,7 +79,12 @@ export function createApp() {
   // whatever is left under /api is a JSON 404, never the app shell
   app.use('/api', (req, res, next) => next(new HttpError(404, 'NOT_FOUND')));
 
-  app.use(express.static(path.join(__dirname, '..', 'public')));
+  app.use(express.static(path.join(__dirname, '..', 'public'), {
+    setHeaders(res, file) {
+      // browsers must always look for a new service worker (and take it, not an old cached copy)
+      if (path.basename(file) === 'sw.js') res.setHeader('Cache-Control', 'no-cache');
+    },
+  }));
   // SPA fallback for client-side routes; a path with a file extension is a missing asset, not a route
   app.get(/^\/(?!api(?:\/|$)).*/, (req, res, next) => {
     if (path.extname(req.path)) return next();

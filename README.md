@@ -47,6 +47,23 @@ database (existing structures are skipped).
 > For scanner phones on the LAN, put a TLS reverse proxy (e.g. Caddy) in
 > front, or use a tunnel.
 
+**Installing as an app:** over HTTPS (or on `localhost`) the browser offers to
+install Tessera to the home screen (manifest + icons in `public/`). A service
+worker (`public/sw.js`) keeps the app files in a cache: they open at once and are
+refreshed in the background, so after an update the new version is used from the
+second load on. Page loads go to the network first and fall back to the cached
+shell when the network is down or does not answer within 4 seconds; the API is
+never cached, so scanning still needs a connection (the scanner says so, and
+nothing is recorded). When the server cannot be reached the app shows a retry
+screen, stays signed in and tries again every 5 seconds. Add new files under `public/` to the list in
+`public/sw.js` (a test fails until you do). The PNG icons are rendered from
+`public/icons/*.svg`:
+
+```sh
+nix shell nixpkgs#librsvg -c rsvg-convert -w 192 -h 192 public/icons/icon.svg -o public/icons/icon-192.png
+# likewise icon.svg -> icon-512.png and icon-maskable.svg -> icon-maskable-512.png at 512 px
+```
+
 ## Configuration
 
 Environment variables:

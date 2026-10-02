@@ -205,6 +205,8 @@ async function doLogout() {
   route();
 }
 
+const CONNECTION_RETRY_MS = 5000;
+let retryTimer = 0;
 let pendingLogin = null; // { username, notice } for the login screen after a session ended
 let expiring = false;
 
@@ -221,6 +223,7 @@ function sessionExpired() {
 setUnauthorizedHandler(sessionExpired);
 
 async function route() {
+  clearTimeout(retryTimer);
   const mine = views.begin();
 
   if (pendingLogin) {
@@ -246,6 +249,8 @@ async function route() {
         dropAccount(name);
         return showLogin(true, { username: name, notice: t('session.expired', { name }) });
       }
+      // the server cannot be reached (offline, or down): the session is fine, so do not ask for a login
+      if (err.status === 0 || err.status >= 500) return showConnectionProblem(err.message);
       return showLogin(false);
     }
     if (!views.isCurrent(mine)) return;
@@ -276,8 +281,26 @@ function showLogin(cancelable, prefill = {}) {
   }, cancelable && activeAccount() ? () => { state.user = null; route(); } : null, prefill);
 }
 
+/** The server cannot be reached: keep the session, offer a retry and keep trying every few seconds. */
+function showConnectionProblem(message) {
+  app.replaceChildren(
+    el('div', { class: 'login-wrap' },
+      el('div', { class: 'login-card' },
+        el('h1', {}, '⬢ Tessera'),
+        el('div', { class: 'notice', role: 'status' }, message),
+        el('p', { class: 'muted' }, t('net.retryHint')),
+        el('button', { class: 'btn', type: 'button', style: 'width:100%', onclick: () => route() }, t('common.retry')))));
+  // not only on the browser's `online` event: that never fires when the network is up but the server is not
+  retryTimer = setTimeout(route, CONNECTION_RETRY_MS);
+}
+
 window.addEventListener('hashchange', route);
 window.addEventListener('tessera:relang', route);
 initTheme();
 initI18n();
 route();
+
+// installable app with an offline shell (needs HTTPS or localhost, like the camera)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}
