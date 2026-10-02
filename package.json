@@ -11,6 +11,7 @@
     "dev": "node --watch server/index.js",
     "migrate": "node server/migrate.js",
     "backup": "node server/backup.js",
+    "vendor": "node scripts/sync-vendor.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "engines": {

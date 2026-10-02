@@ -194,6 +194,12 @@ and can be switched at any time — on the login screen and in the
 account-switcher menu. Preferences are stored per browser and apply
 instantly, without a page reload.
 
+## Vendored libraries
+
+`public/vendor/` holds the browser copies of jsQR, JSZip and qrcode-generator (the app has no
+build step). They are copied from `node_modules`: after `bun update` run `bun run vendor` to refresh
+them; `bun run vendor -- --check` only reports. The test suite fails when a copy has drifted.
+
 ## Health check
 
 `GET /healthz` needs no login and answers `{"status":"ok","version":"…","uptime":<seconds>}` (HTTP 200, never
