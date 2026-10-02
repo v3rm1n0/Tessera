@@ -21,6 +21,10 @@
 #        sudo systemctl daemon-reload
 #        sudo systemctl enable --now tessera
 #
+#   5. Optional: nightly database backups (see deploy/tessera-backup.service) and
+#      a health probe for monitoring:
+#        curl -fsS http://127.0.0.1:3000/healthz
+#
 # The SQLite database lands in /var/lib/tessera (created automatically via
 # StateDirectory). Put a TLS reverse proxy (nginx/Caddy) in front — the
 # scanner needs HTTPS for camera access.

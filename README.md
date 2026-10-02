@@ -16,6 +16,16 @@ bun start            # http://localhost:3000
 Bun is only the package manager (install + script runner); the app itself
 runs on Node.js (it relies on `node:sqlite`).
 
+| Command | What it does |
+|---|---|
+| `bun start` | Starts the server (`node server/index.js`) |
+| `bun run dev` | The same, restarting when files change |
+| `bun run test` | Runs the tests |
+| `bun run migrate` | Applies pending database migrations (see below) |
+| `bun run backup` | Backs up the database (see *Backups*) |
+| `bun run vendor` | Refreshes `public/vendor` from `node_modules` (see *Vendored libraries*) |
+| `node server/reset-owner.js [password]` | Resets the owner password (see *Owner password recovery*) |
+
 Nix is only used for local development (via `flake.nix`); it is **not** the
 deployment target. Production deploys target Debian — see
 `deploy/tessera.service` for a ready-to-use systemd unit (Node.js via
@@ -55,9 +65,10 @@ second load on. Page loads go to the network first and fall back to the cached
 shell when the network is down or does not answer within 4 seconds; the API is
 never cached, so scanning still needs a connection (the scanner says so, and
 nothing is recorded). When the server cannot be reached the app shows a retry
-screen, stays signed in and tries again every 5 seconds. Add new files under `public/` to the list in
-`public/sw.js` (a test fails until you do). The PNG icons are rendered from
-`public/icons/*.svg`:
+screen, stays signed in and tries again every 5 seconds.
+
+Add new files under `public/` to the list in `public/sw.js` (a test fails until you
+do). The PNG icons are rendered from `public/icons/*.svg`:
 
 ```sh
 nix shell nixpkgs#librsvg -c rsvg-convert -w 192 -h 192 public/icons/icon.svg -o public/icons/icon-192.png
@@ -124,6 +135,13 @@ Optionally (checkbox in the export) each folder is bundled with a
 `UUIDs.xlsx` listing just that section's/subsection's UUIDs plus an empty
 "Name (recipient)" column — so section and subsection leads can tick off who
 received which UUID.
+
+The export can be limited to one section or subsection (*Which cards*) and be
+cancelled while it runs. Instead of single PNG files it can produce **print sheets**
+(*Format* → a PDF with six cards per A4 page and a thin cut line around each). Every
+card prints a short code under its QR code (see *Manual entry*). File names and the
+Excel headers follow the interface language (`?lang=de|en` on the Excel endpoints;
+anything else gives English).
 
 **Archiving:** when an event is over, the Owner can archive it (and give it an
 optional start and end date). An archived event is read-only: nothing is scanned
@@ -228,13 +246,22 @@ the machine as well, a backup on the same disk does not survive losing the disk.
 1. Sign in as Owner → **Administration**: create an event, create accounts,
    assign them.
 2. As Event Admin: create sections (with color) and optionally subsections,
-   generate UUIDs per level, design the admission card once and export all
-   cards as a PNG ZIP, export UUIDs as Excel, set the reset time (default
-   00:00).
-3. Scanners open **Scan** on their phone: the camera scans, feedback is:
-   - **OK** (green) with the section's running scan number
-   - **Duplicate** (orange) with the UUID of the already-scanned code
+   generate UUIDs per level, design the admission card once and export the
+   cards (all, or one section) as a PNG ZIP or print-ready PDF sheets, export
+   UUIDs as Excel, set the reset time (default 00:00) and time zone.
+3. Scanners open **Scan** on their phone: the camera scans (a torch button where
+   the phone has one, the screen stays awake, and the camera restarts by itself
+   when it was lost), feedback is:
+   - **OK** (green) with the section's running scan number and the holder's name,
+     if the code has one
+   - **Duplicate** (orange) with the code, and who scanned it first and when
+   - **Revoked** (purple) for a blocked code; nothing is recorded
    - **Error** (red) for an unknown/invalid code
+   - **No connection** (grey) when the request did not get through; nothing is
+     recorded, scan again (a banner also shows while the device is offline)
+
+   A bar above the buttons offers **Undo** for the last scan for a minute, and a
+   code that will not scan can be typed in (keyboard button, see *Manual entry*).
 4. **Dashboard**: section and scan counters (today), clicking a section
    shows the double-scanned codes with their UUIDs.
 
@@ -257,30 +284,34 @@ POST   /api/login | /api/logout      GET /api/me
 POST   /api/admin/users              GET/DELETE likewise             (Owner)
 POST   /api/admin/events             POST /api/admin/events/:id/assignments
 POST   /api/admin/events/:id/users   create account + assign         (Owner)
+DELETE /api/admin/events/:id/assignments/:userId   take an account off an event   (Owner)
+GET    /api/admin/audit              ?before=&limit=   activity log, newest first (Owner)
 PATCH  /api/admin/users/:id          { password }                    (Owner) reset a password
 POST   /api/me/password              { current, next }               any user, changes own password
 PATCH  /api/admin/events/:id         { name?, start_date?, end_date?, archived? }    (Owner)
-PATCH  /api/events/:id               { reset_time: "HH:MM" }         (Event Admin)
+PATCH  /api/events/:id               { reset_time?: "HH:MM", timezone?: "Europe/Berlin" }  (Event Admin)
 POST   /api/events/:id/sections      { name, color? }
 PATCH  /api/sections/:id             { name?, color? }
 PATCH  /api/subsections/:id          { name }
 POST   /api/sections/:id/subsections { name }
 GET/DELETE subsections likewise
 POST   /api/sections/:id/tickets     { count: n, subsection_id? }
-GET    /api/sections/:id/tickets     GET /api/events/:id/tickets.xlsx
+GET    /api/sections/:id/tickets     GET /api/events/:id/tickets.xlsx?lang=de|en
 GET    /api/events/:id/tickets       ?q=&section=&subsection=&status=&limit=&offset=   (Event Admin)
 PATCH  /api/tickets/:uuid            { holder?, revoked? }                           (Event Admin)
 POST   /api/events/:id/holders       raw .xlsx or .csv body, fills in holder names    (Event Admin)
 POST   /api/scans/:id/void           take back a scan (own scan within 60 s; admins: any)
-GET    /api/events/:id/card          PUT { title, text }             (once per event)
+GET    /api/events/:id/card          PUT { title, text }             (once per event; GET also lists the exportable `groups`)
 POST/GET/DELETE /api/events/:id/card/backdrop   (image upload, raw)
-GET    /api/events/:id/card/tickets  flat list for the PNG export
+GET    /api/events/:id/card/tickets  flat list for the export, with section and subsection ids
+GET    /api/events/:id/card/xlsx     ?lang=de|en   one code list per folder (base64 xlsx) for the ZIP export
 GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles   (event roles)
 GET    /api/events/:id/history       per-day totals, sections and hourly throughput (event roles)
 GET    /api/events/:id/scans         ?limit=&before=&result=&q=&day=                  (Event Admin) scan log
 GET    /api/events/:id/scans.xlsx    ?day=&lang=de|en                                 (Event Admin) attendance sheet
 GET    /api/tickets/:code            full uuid or its first 12+ hex digits            (Event Admin) code + scan history
-POST   /api/scan                     { code: "<uuid>" }              (event roles)
+POST   /api/scan                     { code }  a whole uuid or its first 12+ hex digits  (event roles)
+GET    /healthz                      no login: { status, version, uptime }, 503 when the database fails
 ```
 
 Errors are JSON of the form `{ "error": "<English text>", "code": "<CODE>" }`; the
@@ -309,6 +340,9 @@ owner sessions are logged out in the process.
 ```sh
 bun run test
 ```
+
+The same command runs in CI (`.github/workflows/ci.yml`) on every push to `main` and on
+pull requests, and a release (a `v*` tag) is only created after it passed.
 
 ## License
 
