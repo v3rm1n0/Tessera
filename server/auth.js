@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { db, verifyPassword, hashPassword, getEvent } from './db.js';
+import { HttpError } from './errors.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 const COOKIE = 'tessera_session';
@@ -71,16 +72,14 @@ export function attemptLogin(username, password) {
 }
 
 export function requireAuth(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: 'Not signed in' });
+  if (!req.user) throw new HttpError(401, 'NOT_SIGNED_IN');
   next();
 }
 
 export function requireRole(...roles) {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Not signed in' });
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Not authorized' });
-    }
+    if (!req.user) throw new HttpError(401, 'NOT_SIGNED_IN');
+    if (!roles.includes(req.user.role)) throw new HttpError(403, 'NOT_AUTHORIZED');
     next();
   };
 }
@@ -97,10 +96,8 @@ export function canAccessEvent(user, eventId) {
 export function requireEventAccess(req, res, next) {
   const eventId = Number(req.params.eventId);
   const event = getEvent(eventId);
-  if (!event) return res.status(404).json({ error: 'Event not found' });
-  if (!canAccessEvent(req.user, eventId)) {
-    return res.status(403).json({ error: 'Not authorized for this event' });
-  }
+  if (!event) throw new HttpError(404, 'EVENT_NOT_FOUND');
+  if (!canAccessEvent(req.user, eventId)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
   req.event = event;
   next();
 }
@@ -109,10 +106,8 @@ export function requireEventAccess(req, res, next) {
 export function requireSectionAccess(req, res, next) {
   const section = db.prepare('SELECT * FROM sections WHERE id = ?')
     .get(Number(req.params.sectionId));
-  if (!section) return res.status(404).json({ error: 'Section not found' });
-  if (!canAccessEvent(req.user, section.event_id)) {
-    return res.status(403).json({ error: 'Not authorized for this event' });
-  }
+  if (!section) throw new HttpError(404, 'SECTION_NOT_FOUND');
+  if (!canAccessEvent(req.user, section.event_id)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
   req.section = section;
   req.event = getEvent(section.event_id);
   next();

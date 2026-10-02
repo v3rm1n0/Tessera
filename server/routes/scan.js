@@ -1,18 +1,22 @@
 import { Router } from 'express';
 import { db, eventBoundary } from '../db.js';
 import { requireRole, canAccessEvent } from '../auth.js';
+import { CODES } from '../errors.js';
 
 export const scanRouter = Router();
 
 // same user re-scanning the same code within this window repeats the OK response instead of recording a DOUBLE
 const DEBOUNCE_MS = 5000;
 
+/** Scan problems are 200 responses with a status the scanner UI renders; the code lets it translate them. */
+const scanError = code => ({ status: 'ERROR', code, message: CODES[code] });
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   const code = String(req.body?.code || '').trim().toLowerCase();
   if (!UUID_RE.test(code)) {
-    return res.json({ status: 'ERROR', message: 'Invalid code' });
+    return res.json(scanError('INVALID_CODE'));
   }
 
   const ticket = db.prepare(`
@@ -25,10 +29,10 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
     WHERE t.uuid = ?
   `).get(code);
   if (!ticket) {
-    return res.json({ status: 'ERROR', message: 'Unknown code' });
+    return res.json(scanError('UNKNOWN_CODE'));
   }
   if (!canAccessEvent(req.user, ticket.event_id)) {
-    return res.json({ status: 'ERROR', message: 'Not authorized for this event' });
+    return res.json(scanError('NOT_AUTHORIZED_EVENT'));
   }
 
   const since = eventBoundary(ticket.event_id);

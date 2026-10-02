@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db, hashPassword, eventColumns } from '../db.js';
 import { requireRole } from '../auth.js';
+import { HttpError } from '../errors.js';
 import { requireName, requireNewAccount } from '../validate.js';
 
 /** Owner-only administration: accounts, events, assignments. */
@@ -25,7 +26,7 @@ adminRouter.post('/users', (req, res) => {
     res.status(201).json({ id: Number(info.lastInsertRowid), username, role });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Username already taken' });
+      throw new HttpError(409, 'USERNAME_TAKEN');
     }
     throw e;
   }
@@ -33,9 +34,9 @@ adminRouter.post('/users', (req, res) => {
 
 adminRouter.delete('/users/:id', (req, res) => {
   const id = Number(req.params.id);
-  if (id === req.user.id) return res.status(400).json({ error: 'You cannot delete your own account' });
+  if (id === req.user.id) throw new HttpError(400, 'CANNOT_DELETE_SELF');
   const info = db.prepare("DELETE FROM users WHERE id = ? AND role != 'OWNER'").run(id);
-  if (info.changes === 0) return res.status(404).json({ error: 'User not found' });
+  if (info.changes === 0) throw new HttpError(404, 'USER_NOT_FOUND');
   res.json({ ok: true });
 });
 
@@ -51,7 +52,7 @@ adminRouter.get('/events', (req, res) => {
 
 adminRouter.delete('/events/:id', (req, res) => {
   const info = db.prepare('DELETE FROM events WHERE id = ?').run(Number(req.params.id));
-  if (info.changes === 0) return res.status(404).json({ error: 'Event not found' });
+  if (info.changes === 0) throw new HttpError(404, 'EVENT_NOT_FOUND');
   res.json({ ok: true });
 });
 
@@ -59,7 +60,7 @@ adminRouter.delete('/events/:id', (req, res) => {
 adminRouter.post('/events/:id/users', (req, res) => {
   const eventId = Number(req.params.id);
   const event = db.prepare('SELECT id FROM events WHERE id = ?').get(eventId);
-  if (!event) return res.status(404).json({ error: 'Event not found' });
+  if (!event) throw new HttpError(404, 'EVENT_NOT_FOUND');
   const { username, password, role } = requireNewAccount(req.body);
   db.exec('BEGIN');
   try {
@@ -72,7 +73,7 @@ adminRouter.post('/events/:id/users', (req, res) => {
   } catch (e) {
     db.exec('ROLLBACK');
     if (String(e.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Username already taken' });
+      throw new HttpError(409, 'USERNAME_TAKEN');
     }
     throw e;
   }
@@ -83,8 +84,8 @@ adminRouter.post('/events/:id/assignments', (req, res) => {
   const userId = Number(req.body?.userId);
   const event = db.prepare('SELECT id FROM events WHERE id = ?').get(eventId);
   const user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(userId);
-  if (!event || !user) return res.status(404).json({ error: 'Event or user not found' });
-  if (user.role === 'OWNER') return res.status(400).json({ error: 'Owner does not need an assignment' });
+  if (!event || !user) throw new HttpError(404, 'EVENT_OR_USER_NOT_FOUND');
+  if (user.role === 'OWNER') throw new HttpError(400, 'OWNER_NO_ASSIGNMENT');
   db.prepare('INSERT OR IGNORE INTO event_assignments (user_id, event_id) VALUES (?, ?)')
     .run(userId, eventId);
   res.status(201).json({ ok: true });

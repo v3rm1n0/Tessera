@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
+import { HttpError } from '../errors.js';
 import { uniqueSheetName } from '../xlsx.js';
 import { requireName } from '../validate.js';
 
@@ -13,7 +14,7 @@ const manage = requireRole('EVENT_ADMIN');
 eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) => {
   const resetTime = req.body?.reset_time;
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(resetTime || '')) {
-    return res.status(400).json({ error: 'reset_time must be in HH:MM format' });
+    throw new HttpError(400, 'RESET_TIME_INVALID');
   }
   db.prepare('UPDATE events SET reset_time = ? WHERE id = ?').run(resetTime, req.event.id);
   res.json({ ...req.event, reset_time: resetTime });
@@ -25,7 +26,7 @@ eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req,
   const name = requireName(req.body?.name);
   const custom = req.body?.color;
   if (custom !== undefined && !COLOR_RE.test(custom)) {
-    return res.status(400).json({ error: 'color must be in #rrggbb format' });
+    throw new HttpError(400, 'COLOR_INVALID');
   }
   const color = custom || pickSectionColor(req.event.id);
   try {
@@ -34,7 +35,7 @@ eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req,
     res.status(201).json({ id: Number(info.lastInsertRowid), event_id: req.event.id, name, color });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Section already exists' });
+      throw new HttpError(409, 'SECTION_EXISTS');
     }
     throw e;
   }
@@ -44,7 +45,7 @@ eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, (req, r
   const color = req.body?.color;
   if (color !== undefined) {
     if (!COLOR_RE.test(color)) {
-      return res.status(400).json({ error: 'color must be in #rrggbb format' });
+      throw new HttpError(400, 'COLOR_INVALID');
     }
     db.prepare('UPDATE sections SET color = ? WHERE id = ?').run(color, req.section.id);
   }
@@ -64,7 +65,7 @@ eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAcce
     res.status(201).json({ id: Number(info.lastInsertRowid), section_id: req.section.id, name });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Subsection already exists' });
+      throw new HttpError(409, 'SUBSECTION_EXISTS');
     }
     throw e;
   }
@@ -80,10 +81,8 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
     SELECT sub.id, s.event_id FROM subsections sub
     JOIN sections s ON s.id = sub.section_id WHERE sub.id = ?
   `).get(Number(req.params.id));
-  if (!sub) return res.status(404).json({ error: 'Subsection not found' });
-  if (!canAccessEvent(req.user, sub.event_id)) {
-    return res.status(403).json({ error: 'Not authorized for this event' });
-  }
+  if (!sub) throw new HttpError(404, 'SUBSECTION_NOT_FOUND');
+  if (!canAccessEvent(req.user, sub.event_id)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
   // the codes of a subsection go with it (their scans follow via ON DELETE CASCADE); without this
   // they would silently turn into section-level codes under a different label
   db.exec('BEGIN');
@@ -101,13 +100,13 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
 eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, (req, res) => {
   const count = Number(req.body?.count);
   if (!Number.isInteger(count) || count < 1 || count > 10000) {
-    return res.status(400).json({ error: 'count must be between 1 and 10000' });
+    throw new HttpError(400, 'COUNT_INVALID');
   }
   let subsectionId = null;
   if (req.body?.subsection_id != null) {
     const sub = db.prepare('SELECT id FROM subsections WHERE id = ? AND section_id = ?')
       .get(Number(req.body.subsection_id), req.section.id);
-    if (!sub) return res.status(400).json({ error: 'Subsection does not belong to this section' });
+    if (!sub) throw new HttpError(400, 'SUBSECTION_MISMATCH');
     subsectionId = sub.id;
   }
   const insert = db.prepare(
@@ -184,10 +183,10 @@ eventsRouter.post('/events/:eventId/card/backdrop',
   (req, res) => {
     const mime = req.headers['content-type'];
     if (!CARD_MIMES.includes(mime)) {
-      return res.status(400).json({ error: 'Only PNG, JPEG or WebP allowed' });
+      throw new HttpError(400, 'IMAGE_TYPE_INVALID');
     }
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      return res.status(400).json({ error: 'Image data missing' });
+      throw new HttpError(400, 'IMAGE_MISSING');
     }
     db.prepare('UPDATE events SET card_backdrop = ?, card_backdrop_mime = ? WHERE id = ?')
       .run(req.body, mime, req.event.id);
@@ -197,7 +196,7 @@ eventsRouter.post('/events/:eventId/card/backdrop',
 eventsRouter.get('/events/:eventId/card/backdrop', manage, requireEventAccess, (req, res) => {
   const e = db.prepare('SELECT card_backdrop, card_backdrop_mime FROM events WHERE id = ?')
     .get(req.event.id);
-  if (!e.card_backdrop) return res.status(404).json({ error: 'No background image' });
+  if (!e.card_backdrop) throw new HttpError(404, 'NO_BACKDROP');
   res.setHeader('Content-Type', e.card_backdrop_mime);
   res.setHeader('Cache-Control', 'no-store');
   res.end(Buffer.from(e.card_backdrop));

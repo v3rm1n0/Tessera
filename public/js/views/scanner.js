@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { el } from '../app.js';
-import { t, dateLocale } from '../i18n.js';
+import { t, dateLocale, hasKey } from '../i18n.js';
 
 const RESULT_SHOW_MS = 2200;   // how long a result overlay stays before rescanning
 const SAME_CODE_COOLDOWN_MS = 6000; // ignore re-reads of the same code in this window
@@ -100,7 +100,7 @@ export async function renderScanner(content) {
     } else {
       box = el('div', { class: 'scan-result error' },
         el('div', { class: 'big' }, t('scan.errorTitle')),
-        el('div', { class: 'detail' }, r.message || t('scan.invalid')),
+        el('div', { class: 'detail' }, errorText(r)),
         el('div', { class: 'tap' }, t('scan.tap')));
     }
     box.addEventListener('click', dismiss);
@@ -122,4 +122,9 @@ export async function renderScanner(content) {
     clearTimeout(resultTimer);
     stream?.getTracks().forEach(t => t.stop());
   };
+}
+
+/** The scan error in the user's language when the server sent a known code, else its raw text. */
+function errorText(r) {
+  return r.code && hasKey(`err.${r.code}`) ? t(`err.${r.code}`) : (r.message || t('scan.invalid'));
 }
