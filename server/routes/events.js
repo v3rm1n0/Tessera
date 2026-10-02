@@ -251,7 +251,7 @@ eventsRouter.get('/events/:eventId/card/tickets', manage, requireEventAccess, (r
 /** One UUID-list workbook per export folder (grouped by section/subsection), returned as base64 for the client to place. */
 eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async (req, res) => {
   const rows = db.prepare(`
-    SELECT t.uuid, s.id AS section_id, s.name AS section,
+    SELECT t.uuid, t.holder, s.id AS section_id, s.name AS section,
            t.subsection_id, sub.name AS subsection
     FROM tickets t
     JOIN sections s ON s.id = t.section_id
@@ -264,9 +264,9 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
   for (const r of rows) {
     const key = `${r.section_id}|${r.subsection_id ?? ''}`;
     if (!groups.has(key)) {
-      groups.set(key, { section: r.section, subsection: r.subsection, uuids: [] });
+      groups.set(key, { section: r.section, subsection: r.subsection, tickets: [] });
     }
-    groups.get(key).uuids.push(r.uuid);
+    groups.get(key).tickets.push({ uuid: r.uuid, holder: r.holder });
   }
 
   const out = [];
@@ -280,7 +280,7 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
       { header: 'Name (recipient)', key: 'name', width: 30 },
     ];
     sheet.getRow(1).font = { bold: true };
-    for (const uuid of g.uuids) sheet.addRow({ label, uuid, name: '' });
+    for (const t of g.tickets) sheet.addRow({ label, uuid: t.uuid, name: t.holder });
     const buf = await wb.xlsx.writeBuffer();
     out.push({ section: g.section, subsection: g.subsection, base64: Buffer.from(buf).toString('base64') });
   }
@@ -299,6 +299,7 @@ eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, as
       { header: 'Subsection', key: 'subsection', width: 30 },
       { header: 'UUID', key: 'uuid', width: 40 },
       { header: 'Created', key: 'created', width: 22 },
+      { header: 'Name (recipient)', key: 'name', width: 30 },
     ];
     sheet.getRow(1).font = { bold: true };
     for (const t of sectionTickets(section.id)) {
@@ -307,6 +308,7 @@ eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, as
         subsection: t.subsection || '',
         uuid: t.uuid,
         created: new Date(t.created_at),
+        name: t.holder,
       });
     }
   }

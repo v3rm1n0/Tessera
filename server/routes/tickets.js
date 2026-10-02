@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { db, resetBoundary } from '../db.js';
 import { requireRole, requireEventAccess, canAccessEvent } from '../auth.js';
 import { audit } from '../audit.js';
 import { normalizeUuid } from '../codes.js';
 import { HttpError } from '../errors.js';
+import { IMPORT_TYPES, parseHolderRows } from '../holders-import.js';
 
 /** Code management for event admins: search, holder names, revoking. */
 export const ticketsRouter = Router();
@@ -96,4 +97,38 @@ ticketsRouter.patch('/tickets/:uuid', manage, (req, res) => {
   }
   const { event_id: _eventId, ...item } = ticket;
   res.json({ ...item, holder: nextHolder, revoked_at: nextRevokedAt });
+});
+
+const importBody = express.raw({ type: IMPORT_TYPES, limit: '2mb' });
+
+/**
+ * Fills in holder names from a sheet (Excel or CSV): the sheets the app exports work as they are.
+ * Blank names are skipped (what is there stays), codes of other events count as unknown.
+ */
+ticketsRouter.post('/events/:eventId/holders', manage, requireEventAccess, importBody, async (req, res) => {
+  const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  if (!IMPORT_TYPES.includes(type)) throw new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE');
+  const rows = await parseHolderRows(Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), type);
+
+  const update = db.prepare(`
+    UPDATE tickets SET holder = ?
+    WHERE uuid = ? AND section_id IN (SELECT id FROM sections WHERE event_id = ?)
+  `);
+  let updated = 0;
+  let unknown = 0;
+  let skipped = 0;
+  db.exec('BEGIN');
+  try {
+    for (const { uuid, name } of rows) {
+      if (!name) skipped++;
+      else if (update.run(name, uuid, req.event.id).changes > 0) updated++;
+      else unknown++;
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  audit(req, 'holders.import', { eventId: req.event.id, details: { updated, unknown, skipped } });
+  res.json({ updated, unknown, skipped });
 });
