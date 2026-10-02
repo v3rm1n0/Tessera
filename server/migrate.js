@@ -198,6 +198,16 @@ export const MIGRATIONS = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_subsection ON tickets(subsection_id)');
     },
   },
+
+  {
+    id: '010-event-archive-dates',
+    up(db) {
+      // optional event period (YYYY-MM-DD) and the moment an event was archived (read-only afterwards)
+      addColumn(db, 'events', 'start_date', "TEXT NOT NULL DEFAULT ''");
+      addColumn(db, 'events', 'end_date', "TEXT NOT NULL DEFAULT ''");
+      addColumn(db, 'events', 'archived_at', 'INTEGER');
+    },
+  },
 ];
 
 /** Applies every not-yet-applied migration in order, each in its own transaction; returns the applied ids. */

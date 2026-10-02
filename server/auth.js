@@ -119,6 +119,12 @@ export function requireEventAccess(req, res, next) {
   next();
 }
 
+/** After requireEventAccess / requireSectionAccess: archived events are read-only. */
+export function requireWritable(req, res, next) {
+  if (req.event?.archived_at) throw new HttpError(409, 'EVENT_ARCHIVED');
+  next();
+}
+
 /** Express guard for routes with :sectionId — resolves section + event access. */
 export function requireSectionAccess(req, res, next) {
   const section = db.prepare('SELECT * FROM sections WHERE id = ?')

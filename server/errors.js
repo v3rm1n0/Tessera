@@ -43,6 +43,8 @@ export const CODES = {
   HOLDER_TOO_LONG: 'holder must be at most 100 characters',
   NOTHING_TO_UPDATE: 'Nothing to update',
   CODE_REVOKED: 'Code revoked',
+  EVENT_ARCHIVED: 'This event is archived and read-only',
+  DATE_INVALID: 'Dates must be real dates in YYYY-MM-DD format and the end must not be before the start',
   IMPORT_INVALID: 'The file could not be read as an Excel or CSV sheet',
   IMPORT_EMPTY: 'The file contains no codes',
   SCAN_NOT_FOUND: 'Scan not found',

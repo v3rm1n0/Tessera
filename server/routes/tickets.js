@@ -1,6 +1,6 @@
 import express, { Router } from 'express';
 import { db, resetBoundary } from '../db.js';
-import { requireRole, requireEventAccess, canAccessEvent } from '../auth.js';
+import { requireRole, requireEventAccess, requireWritable, canAccessEvent } from '../auth.js';
 import { audit } from '../audit.js';
 import { normalizeUuid } from '../codes.js';
 import { HttpError } from '../errors.js';
@@ -70,9 +70,13 @@ ticketsRouter.get('/events/:eventId/tickets', manage, requireEventAccess, (req, 
 
 ticketsRouter.patch('/tickets/:uuid', manage, (req, res) => {
   const uuid = normalizeUuid(req.params.uuid);
-  const ticket = uuid && db.prepare(`SELECT ${ITEM_COLUMNS}, s.event_id ${ITEM_FROM} WHERE t.uuid = ?`).get(uuid);
+  const ticket = uuid && db.prepare(`
+    SELECT ${ITEM_COLUMNS}, s.event_id, e.archived_at AS event_archived_at ${ITEM_FROM}
+    JOIN events e ON e.id = s.event_id WHERE t.uuid = ?
+  `).get(uuid);
   if (!ticket) throw new HttpError(404, 'TICKET_NOT_FOUND');
   if (!canAccessEvent(req.user, ticket.event_id)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
+  if (ticket.event_archived_at) throw new HttpError(409, 'EVENT_ARCHIVED');
 
   const { holder, revoked } = req.body || {};
   if (holder === undefined && revoked === undefined) throw new HttpError(400, 'NOTHING_TO_UPDATE');
@@ -95,7 +99,7 @@ ticketsRouter.patch('/tickets/:uuid', manage, (req, res) => {
       eventId: ticket.event_id, target: uuid, details: { section: ticket.section },
     });
   }
-  const { event_id: _eventId, ...item } = ticket;
+  const { event_id: _eventId, event_archived_at: _archived, ...item } = ticket;
   res.json({ ...item, holder: nextHolder, revoked_at: nextRevokedAt });
 });
 
@@ -105,7 +109,7 @@ const importBody = express.raw({ type: IMPORT_TYPES, limit: '2mb' });
  * Fills in holder names from a sheet (Excel or CSV): the sheets the app exports work as they are.
  * Blank names are skipped (what is there stays), codes of other events count as unknown.
  */
-ticketsRouter.post('/events/:eventId/holders', manage, requireEventAccess, importBody, async (req, res) => {
+ticketsRouter.post('/events/:eventId/holders', manage, requireEventAccess, requireWritable, importBody, async (req, res) => {
   const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
   if (!IMPORT_TYPES.includes(type)) throw new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE');
   const rows = await parseHolderRows(Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), type);

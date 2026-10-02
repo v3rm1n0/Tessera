@@ -77,13 +77,48 @@ adminRouter.get('/events', (req, res) => {
   res.json(db.prepare(`SELECT ${eventColumns()} FROM events ORDER BY name`).all());
 });
 
+/** '' (no date) or a real calendar date as YYYY-MM-DD. */
+function validDate(value) {
+  if (value === '') return true;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** Rename an event, set its (optional) period, archive or unarchive it. Any combination. */
 adminRouter.patch('/events/:id', (req, res) => {
   const id = Number(req.params.id);
-  const event = db.prepare('SELECT id, name FROM events WHERE id = ?').get(id);
+  const event = db.prepare('SELECT id, name, start_date, end_date, archived_at FROM events WHERE id = ?').get(id);
   if (!event) throw new HttpError(404, 'EVENT_NOT_FOUND');
-  const name = requireName(req.body?.name);
-  db.prepare('UPDATE events SET name = ? WHERE id = ?').run(name, id);
-  if (name !== event.name) audit(req, 'event.rename', { eventId: id, target: name, details: { from: event.name } });
+  const { name, start_date: startDate, end_date: endDate, archived } = req.body || {};
+  if ([name, startDate, endDate, archived].every(value => value === undefined)) {
+    throw new HttpError(400, 'NOTHING_TO_UPDATE');
+  }
+
+  const next = { name: event.name, start_date: event.start_date, end_date: event.end_date, archived_at: event.archived_at };
+  if (name !== undefined) next.name = requireName(name);
+  for (const [key, value] of [['start_date', startDate], ['end_date', endDate]]) {
+    if (value === undefined) continue;
+    if (!validDate(value)) throw new HttpError(400, 'DATE_INVALID');
+    next[key] = value;
+  }
+  if (next.start_date && next.end_date && next.end_date < next.start_date) throw new HttpError(400, 'DATE_INVALID');
+  if (archived !== undefined) {
+    if (typeof archived !== 'boolean') throw new HttpError(400, 'INVALID_REQUEST');
+    next.archived_at = archived ? (event.archived_at ?? Date.now()) : null;
+  }
+
+  db.prepare('UPDATE events SET name = ?, start_date = ?, end_date = ?, archived_at = ? WHERE id = ?')
+    .run(next.name, next.start_date, next.end_date, next.archived_at, id);
+  if (next.name !== event.name) {
+    audit(req, 'event.rename', { eventId: id, target: next.name, details: { from: event.name } });
+  }
+  if (next.start_date !== event.start_date || next.end_date !== event.end_date) {
+    audit(req, 'event.dates', { eventId: id, target: next.name, details: { start_date: next.start_date, end_date: next.end_date } });
+  }
+  if ((event.archived_at === null) !== (next.archived_at === null)) {
+    audit(req, next.archived_at === null ? 'event.unarchive' : 'event.archive', { eventId: id, target: next.name });
+  }
   res.json(getEvent(id));
 });
 

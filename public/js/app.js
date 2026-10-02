@@ -37,7 +37,7 @@ export async function refreshUser() {
   state.user = await api.get('/api/me');
   const stored = Number(localStorage.getItem('tessera_event'));
   const events = state.user.events;
-  state.eventId = events.some(e => e.id === stored) ? stored : (events[0]?.id ?? null);
+  state.eventId = events.some(e => e.id === stored) ? stored : ((events.find(e => !e.archived) ?? events[0])?.id ?? null);
 }
 
 export function el(tag, attrs = {}, ...children) {
@@ -117,12 +117,18 @@ function renderShell(title, bare) {
   }
   sidebar.addEventListener('click', e => { if (e.target.closest('a')) closeMenu(); });
 
+  const option = ev => el('option', { value: ev.id, ...(ev.id === state.eventId ? { selected: '' } : {}) }, ev.name);
+  const liveEvents = state.user.events.filter(ev => !ev.archived);
+  const oldEvents = state.user.events.filter(ev => ev.archived);
   const eventPicker = state.user.role !== 'OWNER' && state.user.events.length > 1
     ? el('select', {
         onchange: e => selectEvent(Number(e.target.value)),
         style: 'width:auto',
-      }, state.user.events.map(ev =>
-        el('option', { value: ev.id, ...(ev.id === state.eventId ? { selected: '' } : {}) }, ev.name)))
+      }, liveEvents.map(option),
+        oldEvents.length > 0 ? el('optgroup', { label: t('event.archivedGroup') }, oldEvents.map(option)) : null)
+    : null;
+  const archivedBadge = currentEvent()?.archived
+    ? el('span', { class: 'badge warn' }, t('event.archivedBadge'))
     : null;
 
   const content = el('div', { class: bare ? '' : 'content' });
@@ -130,7 +136,7 @@ function renderShell(title, bare) {
     el('div', { class: 'shell' },
       sidebar,
       el('main', { class: 'main' },
-        el('header', { class: 'topbar' }, burger, el('h1', {}, title), eventPicker),
+        el('header', { class: 'topbar' }, burger, el('h1', {}, title), archivedBadge, eventPicker),
         content)));
   return content;
 }

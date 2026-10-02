@@ -2,7 +2,7 @@ import express, { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { db, pickSectionColor } from '../db.js';
-import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
+import { requireRole, requireEventAccess, requireSectionAccess, requireWritable, canAccessEvent } from '../auth.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../errors.js';
 import { canonicalTimeZone } from '../time.js';
@@ -16,7 +16,7 @@ const manage = requireRole('EVENT_ADMIN');
 const RESET_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Daily reset settings: the time of day and the IANA time zone it is read in (either or both). */
-eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) => {
+eventsRouter.patch('/events/:eventId', manage, requireEventAccess, requireWritable, (req, res) => {
   const { reset_time: resetTime, timezone } = req.body || {};
   if (resetTime === undefined && timezone === undefined) throw new HttpError(400, 'SETTINGS_REQUIRED');
   const changes = {};
@@ -37,7 +37,7 @@ eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) =>
 
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
-eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req, res) => {
+eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, requireWritable, (req, res) => {
   const name = requireName(req.body?.name);
   const custom = req.body?.color;
   if (custom !== undefined && !COLOR_RE.test(custom)) {
@@ -58,7 +58,7 @@ eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req,
 });
 
 /** Rename and/or recolor a section. */
-eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, (req, res) => {
+eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, requireWritable, (req, res) => {
   const { name, color } = req.body || {};
   if (name === undefined && color === undefined) throw new HttpError(400, 'NOTHING_TO_UPDATE');
   const nextName = name === undefined ? req.section.name : requireName(name);
@@ -78,14 +78,14 @@ eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, (req, r
   res.json(db.prepare('SELECT * FROM sections WHERE id = ?').get(req.section.id));
 });
 
-eventsRouter.delete('/sections/:sectionId', manage, requireSectionAccess, (req, res) => {
+eventsRouter.delete('/sections/:sectionId', manage, requireSectionAccess, requireWritable, (req, res) => {
   const tickets = db.prepare('SELECT COUNT(*) AS n FROM tickets WHERE section_id = ?').get(req.section.id).n;
   db.prepare('DELETE FROM sections WHERE id = ?').run(req.section.id);
   audit(req, 'section.delete', { eventId: req.event.id, target: req.section.name, details: { tickets } });
   res.json({ ok: true });
 });
 
-eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAccess, (req, res) => {
+eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAccess, requireWritable, (req, res) => {
   const name = requireName(req.body?.name);
   try {
     const info = db.prepare('INSERT INTO subsections (section_id, name) VALUES (?, ?)')
@@ -102,11 +102,12 @@ eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAcce
 
 eventsRouter.patch('/subsections/:id', manage, (req, res) => {
   const sub = db.prepare(`
-    SELECT sub.id, sub.name, sub.section_id, s.name AS section, s.event_id FROM subsections sub
-    JOIN sections s ON s.id = sub.section_id WHERE sub.id = ?
+    SELECT sub.id, sub.name, sub.section_id, s.name AS section, s.event_id, e.archived_at FROM subsections sub
+    JOIN sections s ON s.id = sub.section_id JOIN events e ON e.id = s.event_id WHERE sub.id = ?
   `).get(Number(req.params.id));
   if (!sub) throw new HttpError(404, 'SUBSECTION_NOT_FOUND');
   if (!canAccessEvent(req.user, sub.event_id)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
+  if (sub.archived_at) throw new HttpError(409, 'EVENT_ARCHIVED');
   const name = requireName(req.body?.name);
   try {
     db.prepare('UPDATE subsections SET name = ? WHERE id = ?').run(name, sub.id);
@@ -129,11 +130,12 @@ eventsRouter.get('/sections/:sectionId/subsections', manage, requireSectionAcces
 
 eventsRouter.delete('/subsections/:id', manage, (req, res) => {
   const sub = db.prepare(`
-    SELECT sub.id, sub.name, s.name AS section, s.event_id FROM subsections sub
-    JOIN sections s ON s.id = sub.section_id WHERE sub.id = ?
+    SELECT sub.id, sub.name, s.name AS section, s.event_id, e.archived_at FROM subsections sub
+    JOIN sections s ON s.id = sub.section_id JOIN events e ON e.id = s.event_id WHERE sub.id = ?
   `).get(Number(req.params.id));
   if (!sub) throw new HttpError(404, 'SUBSECTION_NOT_FOUND');
   if (!canAccessEvent(req.user, sub.event_id)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
+  if (sub.archived_at) throw new HttpError(409, 'EVENT_ARCHIVED');
   // the codes of a subsection go with it (their scans follow via ON DELETE CASCADE); without this
   // they would silently turn into section-level codes under a different label
   db.exec('BEGIN');
@@ -151,7 +153,7 @@ eventsRouter.delete('/subsections/:id', manage, (req, res) => {
   }
 });
 
-eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, (req, res) => {
+eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, requireWritable, (req, res) => {
   const count = Number(req.body?.count);
   if (!Number.isInteger(count) || count < 1 || count > 10000) {
     throw new HttpError(400, 'COUNT_INVALID');
@@ -229,7 +231,7 @@ eventsRouter.get('/events/:eventId/card', manage, requireEventAccess, (req, res)
   });
 });
 
-eventsRouter.put('/events/:eventId/card', manage, requireEventAccess, (req, res) => {
+eventsRouter.put('/events/:eventId/card', manage, requireEventAccess, requireWritable, (req, res) => {
   const title = String(req.body?.title ?? '').slice(0, 200);
   const text = String(req.body?.text ?? '').slice(0, 4000);
   db.prepare('UPDATE events SET card_title = ?, card_text = ? WHERE id = ?')
@@ -238,7 +240,7 @@ eventsRouter.put('/events/:eventId/card', manage, requireEventAccess, (req, res)
 });
 
 eventsRouter.post('/events/:eventId/card/backdrop',
-  manage, requireEventAccess,
+  manage, requireEventAccess, requireWritable,
   express.raw({ type: CARD_MIMES, limit: '8mb' }),
   (req, res) => {
     const mime = req.headers['content-type'];
@@ -262,7 +264,7 @@ eventsRouter.get('/events/:eventId/card/backdrop', manage, requireEventAccess, (
   res.end(Buffer.from(e.card_backdrop));
 });
 
-eventsRouter.delete('/events/:eventId/card/backdrop', manage, requireEventAccess, (req, res) => {
+eventsRouter.delete('/events/:eventId/card/backdrop', manage, requireEventAccess, requireWritable, (req, res) => {
   db.prepare('UPDATE events SET card_backdrop = NULL, card_backdrop_mime = NULL WHERE id = ?')
     .run(req.event.id);
   res.json({ ok: true });

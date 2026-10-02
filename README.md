@@ -107,6 +107,12 @@ Optionally (checkbox in the export) each folder is bundled with a
 "Name (recipient)" column — so section and subsection leads can tick off who
 received which UUID.
 
+**Archiving:** when an event is over, the Owner can archive it (and give it an
+optional start and end date). An archived event is read-only: nothing is scanned
+or changed any more, while the dashboard, history, scan log and exports stay
+available. Archived events move out of the way in the event picker and can be
+unarchived at any time.
+
 **Passwords:** every user can change their own password (account menu → *Change
 password*; other devices are signed out). The Owner can reset any account's
 password (the form suggests a generated one to hand over), and new accounts get a
@@ -199,7 +205,7 @@ POST   /api/admin/events             POST /api/admin/events/:id/assignments
 POST   /api/admin/events/:id/users   create account + assign         (Owner)
 PATCH  /api/admin/users/:id          { password }                    (Owner) reset a password
 POST   /api/me/password              { current, next }               any user, changes own password
-PATCH  /api/admin/events/:id         { name }                        (Owner) rename
+PATCH  /api/admin/events/:id         { name?, start_date?, end_date?, archived? }    (Owner)
 PATCH  /api/events/:id               { reset_time: "HH:MM" }         (Event Admin)
 POST   /api/events/:id/sections      { name, color? }
 PATCH  /api/sections/:id             { name?, color? }

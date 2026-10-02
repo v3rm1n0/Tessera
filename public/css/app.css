@@ -243,6 +243,10 @@ button.row:hover { background: var(--color-background-card); }
 .row-wrap > .row { border-bottom: none; }
 .reset-panel { padding: 0 var(--spacing-4) var(--spacing-4); }
 
+/* archived events (owner) */
+.archived-events { margin-top: var(--spacing-3); }
+.archived-events > summary { cursor: pointer; color: var(--color-text-secondary); font-size: var(--font-size-base); padding: var(--spacing-2) 0; }
+
 /* inline rename */
 .editable { display: flex; align-items: center; gap: var(--spacing-1-5); min-width: 0; }
 .editable-form { flex: 1; }
@@ -314,7 +318,7 @@ input.color-input {
 .btn.danger { background: var(--color-error-muted); color: var(--color-error); border: 1px solid var(--color-error); }
 .btn.sm { padding: var(--spacing-1) var(--spacing-3); font-size: var(--font-size-base); border-radius: var(--radius-inner); }
 
-input[type=text], input[type=password], input[type=number], input[type=time], input[type=search], select, textarea {
+input[type=text], input[type=password], input[type=number], input[type=time], input[type=date], input[type=search], select, textarea {
   background: var(--color-background-surface); color: var(--color-text-primary);
   border: 1px solid var(--color-border); border-radius: var(--radius-element);
   padding: var(--spacing-2) var(--spacing-3); width: 100%;

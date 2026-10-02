@@ -49,7 +49,8 @@ async function ownerBlock(reload) {
     } catch (err) { flash(err); }
   });
 
-  const eventCards = events.map(ev => {
+  const renderEvent = ev => {
+    const archived = Boolean(ev.archived_at);
     const assigned = accounts.filter(u => u.event_ids.includes(ev.id));
     const unassigned = accounts.filter(u => !u.event_ids.includes(ev.id));
 
@@ -96,13 +97,40 @@ async function ownerBlock(reload) {
       } catch (err) { flash(err); }
     });
 
+    const startInput = el('input', { type: 'date', value: ev.start_date, 'aria-label': t('admin.startDate'), style: 'width:auto' });
+    const endInput = el('input', { type: 'date', value: ev.end_date, 'aria-label': t('admin.endDate'), style: 'width:auto' });
+    const datesForm = el('form', { class: 'inline-form', style: 'flex-wrap:wrap;margin-bottom:10px' },
+      el('span', { class: 'muted', style: 'font-size:12.5px' }, t('admin.dates')),
+      startInput, el('span', { class: 'muted' }, '–'), endInput,
+      el('button', { class: 'btn secondary sm', type: 'submit' }, t('admin.saveDates')));
+    datesForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        await api.patch(`/api/admin/events/${ev.id}`, { start_date: startInput.value, end_date: endInput.value });
+        await refreshUser();
+        reload();
+      } catch (err) { flash(err); }
+    });
+
     return el('div', { class: 'card', style: 'margin-bottom:14px' },
-      el('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:10px' },
+      el('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap' },
         editableName({
           attrs: { class: 'title', style: 'font-weight:600' }, name: ev.name, wrapStyle: 'flex:1',
           onSave: async name => { await api.patch(`/api/admin/events/${ev.id}`, { name }); await refreshUser(); reload(); },
         }),
+        archived ? el('span', { class: 'badge warn' }, t('event.archivedBadge')) : null,
         el('span', { class: 'muted', style: 'font-size:12.5px' }, t('admin.reset', { time: ev.reset_time })),
+        el('button', {
+          class: 'btn secondary sm', type: 'button',
+          onclick: async () => {
+            if (!archived && !confirm(t('admin.confirmArchive', { event: ev.name }))) return;
+            try {
+              await api.patch(`/api/admin/events/${ev.id}`, { archived: !archived });
+              await refreshUser();
+              reload();
+            } catch (err) { flash(err); }
+          },
+        }, archived ? t('admin.unarchive') : t('admin.archive')),
         el('button', {
           class: 'btn danger sm',
           onclick: async () => {
@@ -114,12 +142,15 @@ async function ownerBlock(reload) {
             } catch (err) { flash(err); }
           },
         }, t('common.delete'))),
+      datesForm,
       el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px' },
         memberChips.length > 0 ? memberChips
           : el('span', { class: 'muted', style: 'font-size:13px' }, t('admin.noAccounts'))),
       createForm,
       unassigned.length > 0 ? el('div', { style: 'margin-top:8px' }, addExisting) : null);
-  });
+  };
+  const activeCards = events.filter(ev => !ev.archived_at).map(renderEvent);
+  const archivedCards = events.filter(ev => ev.archived_at).map(renderEvent);
 
   const accountRows = accounts.map(u => {
     const panel = el('div', { style: 'display:none' });
@@ -151,8 +182,13 @@ async function ownerBlock(reload) {
     el('div', { class: 'section-head' }, el('h2', {}, t('admin.eventsHead'))),
     evForm,
     el('div', { style: 'margin-top:12px' },
-      eventCards.length > 0 ? eventCards
+      activeCards.length > 0 ? activeCards
         : el('div', { class: 'empty' }, t('admin.noEvents'))),
+    archivedCards.length > 0
+      ? el('details', { class: 'archived-events' },
+          el('summary', {}, t('admin.archivedHead', { n: archivedCards.length })),
+          el('div', { style: 'margin-top:12px' }, archivedCards))
+      : null,
     el('div', { class: 'section-head' }, el('h2', {}, t('admin.allAccounts'))),
     accountRows.length > 0
       ? el('div', { class: 'list' }, accountRows)

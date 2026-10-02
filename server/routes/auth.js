@@ -75,12 +75,13 @@ authRouter.post('/logout', (req, res) => {
 });
 
 authRouter.get('/me', requireAuth, (req, res) => {
-  const events = req.user.role === 'OWNER'
-    ? db.prepare('SELECT id, name, reset_time, timezone FROM events ORDER BY name').all()
+  const rows = req.user.role === 'OWNER'
+    ? db.prepare('SELECT id, name, reset_time, timezone, start_date, end_date, archived_at FROM events ORDER BY name').all()
     : db.prepare(`
-        SELECT e.id, e.name, e.reset_time, e.timezone FROM events e
+        SELECT e.id, e.name, e.reset_time, e.timezone, e.start_date, e.end_date, e.archived_at FROM events e
         JOIN event_assignments a ON a.event_id = e.id
         WHERE a.user_id = ? ORDER BY e.name
       `).all(req.user.id);
+  const events = rows.map(({ archived_at: archivedAt, ...event }) => ({ ...event, archived: archivedAt !== null }));
   res.json({ ...req.user, events });
 });

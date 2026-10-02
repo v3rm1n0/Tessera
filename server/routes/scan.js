@@ -26,11 +26,12 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   }
 
   const ticket = db.prepare(`
-    SELECT t.uuid, t.section_id, t.holder, t.revoked_at, s.event_id,
+    SELECT t.uuid, t.section_id, t.holder, t.revoked_at, s.event_id, e.archived_at,
            CASE WHEN sub.name IS NULL THEN s.name
                 ELSE s.name || ' – ' || sub.name END AS section_name
     FROM tickets t
     JOIN sections s ON s.id = t.section_id
+    JOIN events e ON e.id = s.event_id
     LEFT JOIN subsections sub ON sub.id = t.subsection_id
     WHERE t.uuid = ?
   `).get(code);
@@ -39,6 +40,9 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   }
   if (!canAccessEvent(req.user, ticket.event_id)) {
     return res.json(scanError('NOT_AUTHORIZED_EVENT'));
+  }
+  if (ticket.archived_at) {
+    return res.json(scanError('EVENT_ARCHIVED'));
   }
   if (ticket.revoked_at) {
     // a revoked code is refused outright and not recorded as a scan
@@ -125,12 +129,13 @@ scanRouter.post('/scans/:id/void', requireRole('EVENT_ADMIN', 'SCANNER'), (req, 
   const id = Number(req.params.id);
   const scan = db.prepare(`
     SELECT sc.id, sc.ticket_uuid, sc.result, sc.scanned_by, sc.scanned_at, sc.voided_at,
-           s.event_id, s.name AS section
-    FROM scans sc JOIN sections s ON s.id = sc.section_id
+           s.event_id, s.name AS section, e.archived_at
+    FROM scans sc JOIN sections s ON s.id = sc.section_id JOIN events e ON e.id = s.event_id
     WHERE sc.id = ?
   `).get(id);
   if (!scan) throw new HttpError(404, 'SCAN_NOT_FOUND');
   if (!canAccessEvent(req.user, scan.event_id)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
+  if (scan.archived_at) throw new HttpError(409, 'EVENT_ARCHIVED');
   if (req.user.role !== 'EVENT_ADMIN') {
     if (scan.scanned_by !== req.user.id) throw new HttpError(403, 'NOT_AUTHORIZED');
     if (Date.now() - scan.scanned_at > UNDO_WINDOW_MS) throw new HttpError(403, 'UNDO_EXPIRED');
