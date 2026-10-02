@@ -119,3 +119,16 @@ export function dayBoundaries(resetTime, timeZone, fromMs, toMs) {
   }
   return out;
 }
+
+/**
+ * A Date whose UTC fields show the wall-clock time of `ms` in the zone ('' = the server's own
+ * zone). Spreadsheet cells carry no zone, so exports write these to display local times.
+ */
+export function wallClockDate(ms, timeZone = '') {
+  if (!timeZone) {
+    const d = new Date(ms);
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()));
+  }
+  const p = zonedParts(new Date(ms), timeZone);
+  return new Date(Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second));
+}

@@ -191,6 +191,9 @@ POST/GET/DELETE /api/events/:id/card/backdrop   (image upload, raw)
 GET    /api/events/:id/card/tickets  flat list for the PNG export
 GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles   (event roles)
 GET    /api/events/:id/history       per-day totals, sections and hourly throughput (event roles)
+GET    /api/events/:id/scans         ?limit=&before=&result=&q=&day=                  (Event Admin) scan log
+GET    /api/events/:id/scans.xlsx    ?day=&lang=de|en                                 (Event Admin) attendance sheet
+GET    /api/tickets/:code            full uuid or its first 12+ hex digits            (Event Admin) code + scan history
 POST   /api/scan                     { code: "<uuid>" }              (event roles)
 ```
 

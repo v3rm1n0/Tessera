@@ -36,6 +36,7 @@ export const CODES = {
   SETTINGS_REQUIRED: 'Provide reset_time and/or timezone',
   COUNT_INVALID: 'count must be between 1 and 10000',
   TICKET_NOT_FOUND: 'Code not found',
+  CODE_AMBIGUOUS: 'Code is ambiguous, provide more characters',
   HOLDER_INVALID: 'holder must be text',
   HOLDER_TOO_LONG: 'holder must be at most 100 characters',
   NOTHING_TO_UPDATE: 'Nothing to update',
