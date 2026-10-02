@@ -35,6 +35,7 @@ const PRECACHE = [
   '/js/theme.js',
   '/js/time-format.js',
   '/js/ui.js',
+  '/js/vendor.js',
   '/js/view-host.js',
   '/js/views/account.js',
   '/js/views/admin.js',

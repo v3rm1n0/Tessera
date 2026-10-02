@@ -4,6 +4,7 @@ import { t, dateLocale, hasKey } from '../i18n.js';
 import { icon } from '../icons.js';
 import { describeResult, undoActive, UNDO_WINDOW_MS } from '../scan-result.js';
 import { torchSupported, setTorch, createWakeLock, watchCamera } from '../camera.js';
+import { loadVendor } from '../vendor.js';
 
 const RESULT_SHOW_MS = 2200;   // how long a result overlay stays before rescanning
 const SAME_CODE_COOLDOWN_MS = 6000; // ignore re-reads of the same code in this window
@@ -30,10 +31,12 @@ export async function renderScanner(content) {
   const undoText = el('span', { class: 'undo-text' });
   const undoButton = el('button', { type: 'button', class: 'btn sm', onclick: () => undoLast() }, t('scan.undo'));
   const undoBar = el('div', { class: 'undo-bar', role: 'status', hidden: '' }, undoText, undoButton);
+  const cameraErrorTitle = el('p', {}, t('scan.noCamera'));
+  const cameraErrorHelp = el('p', { class: 'muted' }, t('scan.cameraHelp'));
   const cameraError = el('div', { class: 'camera-error', hidden: '' },
     el('div', {},
-      el('p', {}, t('scan.noCamera')),
-      el('p', { class: 'muted' }, t('scan.cameraHelp')),
+      cameraErrorTitle,
+      cameraErrorHelp,
       el('button', { type: 'button', class: 'btn', onclick: () => startCamera() }, t('scan.retry'))));
   const view = el('div', { class: 'scanner-view' },
     video,
@@ -91,7 +94,14 @@ export async function renderScanner(content) {
     starting ??= (async () => {
       releaseCamera();
       cameraError.hidden = true;
+      let decoderMissing = false;
       try {
+        try {
+          await loadVendor('jsqr');
+        } catch (err) {
+          decoderMissing = true;
+          throw err;
+        }
         const next = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
           audio: false,
@@ -107,6 +117,9 @@ export async function renderScanner(content) {
       } catch {
         releaseCamera();
         syncTorch();
+        // a script that could not be fetched is a connection problem, not a camera problem
+        cameraErrorTitle.textContent = decoderMissing ? t('err.NETWORK') : t('scan.noCamera');
+        cameraErrorHelp.hidden = decoderMissing;
         cameraError.hidden = false;
       } finally {
         starting = null;

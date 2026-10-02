@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { activeToken } from '../session.js';
 import { el } from '../app.js';
 import { CARD_W, CARD_H, drawCard, qrMatrix, shortCode } from '../card-render.js';
+import { loadVendor } from '../vendor.js';
 import { t } from '../i18n.js';
 
 const PLACEHOLDER_UUID = '00000000-0000-4000-8000-000000000000';
@@ -11,7 +12,10 @@ const safe = s => s.replace(/[^\p{L}\p{N}_-]+/gu, '_');
 export async function renderCardEditor(content, eventId) {
   let cfg;
   try {
-    cfg = await api.get(`/api/events/${eventId}/card`);
+    [cfg] = await Promise.all([
+      api.get(`/api/events/${eventId}/card`),
+      loadVendor('qrcode').catch(() => { throw new Error(t('err.NETWORK')); }), // the preview needs it
+    ]);
   } catch (err) {
     content.replaceChildren(el('div', { class: 'error-text' }, err.message));
     return;
@@ -163,6 +167,7 @@ export async function renderCardEditor(content, eventId) {
     bulkBtn.disabled = true;
     progress.textContent = t('card.loadingUuids');
     try {
+      await loadVendor('jszip').catch(() => { throw new Error(t('err.NETWORK')); });
       const tickets = await api.get(`/api/events/${eventId}/card/tickets`);
       if (tickets.length === 0) { progress.textContent = t('card.noUuidsDot'); return; }
       const zip = new window.JSZip();
