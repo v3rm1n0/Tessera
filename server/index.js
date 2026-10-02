@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,11 @@ import { reportsRouter } from './routes/reports.js';
 import { scanRouter } from './routes/scan.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+// Fonts and vendored scripts only change with a release, so browsers may keep them; the app's own files
+// are revalidated on every load (cheap: they come back as 304 when unchanged).
+const STATIC_MAX_AGE = { fonts: 7 * 24 * 3600, vendor: 24 * 3600 };
 const { version: VERSION } = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
 // bring the schema up to date before the app (or any test) touches the db
@@ -84,6 +90,9 @@ export function createApp({ healthCheck = () => db.prepare('SELECT 1').get() } =
     res.json({ status: 'ok', version: VERSION, uptime: Math.round(process.uptime()) });
   });
 
+  // gzip text-like answers above 1 KB (scripts, styles, the JSON lists); xlsx, png and woff2 are already
+  // compressed and are skipped by their media type
+  app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use(sessionMiddleware);
 
@@ -98,16 +107,21 @@ export function createApp({ healthCheck = () => db.prepare('SELECT 1').get() } =
   // whatever is left under /api is a JSON 404, never the app shell
   app.use('/api', (req, res, next) => next(new HttpError(404, 'NOT_FOUND')));
 
-  app.use(express.static(path.join(__dirname, '..', 'public'), {
+  app.use(express.static(PUBLIC_DIR, {
     setHeaders(res, file) {
-      // browsers must always look for a new service worker (and take it, not an old cached copy)
-      if (path.basename(file) === 'sw.js') res.setHeader('Cache-Control', 'no-cache');
+      const folder = path.relative(PUBLIC_DIR, file).split(path.sep)[0];
+      if (path.basename(file) === 'sw.js') {
+        // browsers must always look for a new service worker (and take it, not an old cached copy)
+        res.setHeader('Cache-Control', 'no-cache');
+      } else if (Object.hasOwn(STATIC_MAX_AGE, folder)) {
+        res.setHeader('Cache-Control', `public, max-age=${STATIC_MAX_AGE[folder]}`);
+      }
     },
   }));
   // SPA fallback for client-side routes; a path with a file extension is a missing asset, not a route
   app.get(/^\/(?!api(?:\/|$)).*/, (req, res, next) => {
     if (path.extname(req.path)) return next();
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   app.use((req, res) => res.status(404).type('text/plain').send('Not found'));
 

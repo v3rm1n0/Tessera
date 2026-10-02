@@ -194,6 +194,12 @@ and can be switched at any time — on the login screen and in the
 account-switcher menu. Preferences are stored per browser and apply
 instantly, without a page reload.
 
+## Performance
+
+Text-like responses above 1 KB (scripts, styles, JSON lists) are gzip-compressed (`compression`);
+files that are compressed already (xlsx, png, woff2) are not. Fonts are cached by browsers for a week
+and the vendored scripts for a day; the app's own files are revalidated on every load.
+
 ## Vendored libraries
 
 `public/vendor/` holds the browser copies of jsQR, JSZip and qrcode-generator (the app has no

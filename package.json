@@ -18,6 +18,7 @@
     "node": ">=24"
   },
   "dependencies": {
+    "compression": "^1.8.2",
     "exceljs": "^4.4.0",
     "express": "^5.2.1"
   },
