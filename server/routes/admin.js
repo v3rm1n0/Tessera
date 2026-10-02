@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db, hashPassword, eventColumns } from '../db.js';
+import { db, hashPassword, eventColumns, getEvent } from '../db.js';
 import { requireRole } from '../auth.js';
 import { audit, listAudit } from '../audit.js';
 import { HttpError } from '../errors.js';
@@ -56,6 +56,16 @@ adminRouter.post('/events', (req, res) => {
 
 adminRouter.get('/events', (req, res) => {
   res.json(db.prepare(`SELECT ${eventColumns()} FROM events ORDER BY name`).all());
+});
+
+adminRouter.patch('/events/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const event = db.prepare('SELECT id, name FROM events WHERE id = ?').get(id);
+  if (!event) throw new HttpError(404, 'EVENT_NOT_FOUND');
+  const name = requireName(req.body?.name);
+  db.prepare('UPDATE events SET name = ? WHERE id = ?').run(name, id);
+  if (name !== event.name) audit(req, 'event.rename', { eventId: id, target: name, details: { from: event.name } });
+  res.json(getEvent(id));
 });
 
 adminRouter.delete('/events/:id', (req, res) => {

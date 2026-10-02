@@ -1,5 +1,6 @@
 import { api } from '../api.js';
 import { downloadFile } from '../download.js';
+import { editableName } from '../ui.js';
 import { el, state, currentEvent, refreshUser } from '../app.js';
 import { t, hasKey, dateLocale } from '../i18n.js';
 
@@ -96,7 +97,10 @@ async function ownerBlock(reload) {
 
     return el('div', { class: 'card', style: 'margin-bottom:14px' },
       el('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:10px' },
-        el('div', { class: 'title', style: 'flex:1;font-weight:600' }, ev.name),
+        editableName({
+          attrs: { class: 'title', style: 'font-weight:600' }, name: ev.name, wrapStyle: 'flex:1',
+          onSave: async name => { await api.patch(`/api/admin/events/${ev.id}`, { name }); await refreshUser(); reload(); },
+        }),
         el('span', { class: 'muted', style: 'font-size:12.5px' }, t('admin.reset', { time: ev.reset_time })),
         el('button', {
           class: 'btn danger sm',
@@ -252,7 +256,10 @@ async function eventBlock(reload) {
       el('div', { class: 'subcard' },
         el('span', { class: 'color-dot', style: `background:${s.color};opacity:0.6` }),
         el('div', { class: 'grow' },
-          el('div', { class: 'title', style: 'font-size:14px' }, sub.name),
+          editableName({
+            attrs: { class: 'title', style: 'font-size:14px' }, name: sub.name,
+            onSave: async name => { await api.patch(`/api/subsections/${sub.id}`, { name }); reload(); },
+          }),
           el('div', { class: 'muted', style: 'font-size:12px' }, t('admin.subCodes', { n: sub.ticket_count }))),
         uuidGen(`/api/sections/${s.id}/tickets`, { subsection_id: sub.id }),
         el('button', {
@@ -276,7 +283,10 @@ async function eventBlock(reload) {
       el('div', { class: 'section-card-head' },
         colorInput,
         el('div', { class: 'grow' },
-          el('div', { class: 'title' }, s.name),
+          editableName({
+            attrs: { class: 'title' }, name: s.name,
+            onSave: async name => { await api.patch(`/api/sections/${s.id}`, { name }); reload(); },
+          }),
           el('div', { class: 'muted', style: 'font-size:12.5px' }, t('admin.codesTotal', { n: s.ticket_count }))),
         el('button', {
           class: 'btn danger sm',

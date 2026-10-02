@@ -107,6 +107,10 @@ Optionally (checkbox in the export) each folder is bundled with a
 "Name (recipient)" column — so section and subsection leads can tick off who
 received which UUID.
 
+**Renaming:** the Owner can rename events and event admins can rename sections and
+subsections (pencil next to the name); codes, scans and cards stay attached, and
+scan labels pick up the new name immediately.
+
 **Activity log:** administrative actions (accounts, events, assignments, sections,
 subsections, code generation, deletions, event settings) are recorded with who did
 them and shown to the Owner under Administration → Activity (`GET /api/admin/audit`).
@@ -188,9 +192,11 @@ POST   /api/login | /api/logout      GET /api/me
 POST   /api/admin/users              GET/DELETE likewise             (Owner)
 POST   /api/admin/events             POST /api/admin/events/:id/assignments
 POST   /api/admin/events/:id/users   create account + assign         (Owner)
+PATCH  /api/admin/events/:id         { name }                        (Owner) rename
 PATCH  /api/events/:id               { reset_time: "HH:MM" }         (Event Admin)
 POST   /api/events/:id/sections      { name, color? }
-PATCH  /api/sections/:id             { color }
+PATCH  /api/sections/:id             { name?, color? }
+PATCH  /api/subsections/:id          { name }
 POST   /api/sections/:id/subsections { name }
 GET/DELETE subsections likewise
 POST   /api/sections/:id/tickets     { count: n, subsection_id? }

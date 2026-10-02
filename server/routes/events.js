@@ -57,13 +57,23 @@ eventsRouter.post('/events/:eventId/sections', manage, requireEventAccess, (req,
   }
 });
 
+/** Rename and/or recolor a section. */
 eventsRouter.patch('/sections/:sectionId', manage, requireSectionAccess, (req, res) => {
-  const color = req.body?.color;
-  if (color !== undefined) {
-    if (!COLOR_RE.test(color)) {
-      throw new HttpError(400, 'COLOR_INVALID');
-    }
-    db.prepare('UPDATE sections SET color = ? WHERE id = ?').run(color, req.section.id);
+  const { name, color } = req.body || {};
+  if (name === undefined && color === undefined) throw new HttpError(400, 'NOTHING_TO_UPDATE');
+  const nextName = name === undefined ? req.section.name : requireName(name);
+  if (color !== undefined && (typeof color !== 'string' || !COLOR_RE.test(color))) {
+    throw new HttpError(400, 'COLOR_INVALID');
+  }
+  try {
+    db.prepare('UPDATE sections SET name = ?, color = ? WHERE id = ?')
+      .run(nextName, color ?? req.section.color, req.section.id);
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) throw new HttpError(409, 'SECTION_EXISTS');
+    throw e;
+  }
+  if (nextName !== req.section.name) {
+    audit(req, 'section.rename', { eventId: req.event.id, target: nextName, details: { from: req.section.name } });
   }
   res.json(db.prepare('SELECT * FROM sections WHERE id = ?').get(req.section.id));
 });
@@ -88,6 +98,28 @@ eventsRouter.post('/sections/:sectionId/subsections', manage, requireSectionAcce
     }
     throw e;
   }
+});
+
+eventsRouter.patch('/subsections/:id', manage, (req, res) => {
+  const sub = db.prepare(`
+    SELECT sub.id, sub.name, sub.section_id, s.name AS section, s.event_id FROM subsections sub
+    JOIN sections s ON s.id = sub.section_id WHERE sub.id = ?
+  `).get(Number(req.params.id));
+  if (!sub) throw new HttpError(404, 'SUBSECTION_NOT_FOUND');
+  if (!canAccessEvent(req.user, sub.event_id)) throw new HttpError(403, 'NOT_AUTHORIZED_EVENT');
+  const name = requireName(req.body?.name);
+  try {
+    db.prepare('UPDATE subsections SET name = ? WHERE id = ?').run(name, sub.id);
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) throw new HttpError(409, 'SUBSECTION_EXISTS');
+    throw e;
+  }
+  if (name !== sub.name) {
+    audit(req, 'subsection.rename', {
+      eventId: sub.event_id, target: name, details: { from: sub.name, section: sub.section },
+    });
+  }
+  res.json({ id: sub.id, section_id: sub.section_id, name });
 });
 
 eventsRouter.get('/sections/:sectionId/subsections', manage, requireSectionAccess, (req, res) => {

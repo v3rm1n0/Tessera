@@ -237,6 +237,12 @@ button.row:hover { background: var(--color-background-card); }
   .scan-line { grid-template-columns: 1fr 1fr; }
 }
 
+/* inline rename */
+.editable { display: flex; align-items: center; gap: var(--spacing-1-5); min-width: 0; }
+.editable-form { flex: 1; }
+.editable .btn-icon { opacity: 0.55; }
+.editable:hover .btn-icon, .editable .btn-icon:focus-visible { opacity: 1; }
+
 /* scan log */
 .log-row { display: grid; grid-template-columns: 11.5em 8em 1fr minmax(6em, auto); gap: var(--spacing-3); align-items: center; padding: var(--spacing-2) var(--spacing-4); background: var(--color-background-surface); border-bottom: 1px solid var(--color-border); font-size: var(--font-size-base); }
 .log-row:last-child { border-bottom: none; }
