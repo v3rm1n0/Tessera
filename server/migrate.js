@@ -232,7 +232,7 @@ export function runMigrations(db) {
       justApplied.push(migration.id);
     } catch (e) {
       db.exec('ROLLBACK');
-      throw new Error(`Migration ${migration.id} fehlgeschlagen: ${e.message}`);
+      throw new Error(`Migration ${migration.id} failed: ${e.message}`);
     }
   }
   return justApplied;
@@ -242,9 +242,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { db } = await import('./db.js');
   const applied = runMigrations(db);
   if (applied.length) {
-    console.log(`${applied.length} Migration(en) angewendet:`);
+    console.log(`Applied ${applied.length} migration${applied.length === 1 ? '' : 's'}:`);
     for (const id of applied) console.log(`  ✓ ${id}`);
   } else {
-    console.log('Keine ausstehenden Migrationen – Schema ist aktuell.');
+    console.log('No pending migrations – the schema is up to date.');
   }
 }

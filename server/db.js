@@ -81,6 +81,15 @@ export function eventBoundary(eventId) {
   return resetBoundary(ev.reset_time, new Date(), ev.timezone);
 }
 
+/**
+ * The console box that shows the owner's credentials. A generated password is shown exactly once, so
+ * this is where an operator finds it (the journal, under systemd).
+ */
+export function ownerBanner({ username, password, heading = 'Owner account created' }) {
+  const rule = '='.repeat(46);
+  return [rule, `  ${heading}:`, `  Username: ${username}`, `  Password: ${password}`, rule].join('\n');
+}
+
 export function seedOwner() {
   const existing = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'OWNER'").get();
   if (existing.n > 0) return null;

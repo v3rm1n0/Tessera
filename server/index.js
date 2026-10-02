@@ -3,7 +3,7 @@ import compression from 'compression';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db, seedOwner } from './db.js';
+import { db, seedOwner, ownerBanner } from './db.js';
 import { runMigrations } from './migrate.js';
 import { sessionMiddleware, purgeExpiredSessions } from './auth.js';
 import { HttpError, errorHandler } from './errors.js';
@@ -71,6 +71,8 @@ export function resolveListen(env = process.env) {
  * `healthCheck` throws when the app cannot do its job; the default asks the database a question, so a
  * database that is gone, locked or corrupt shows up in the probe.
  */
+export { ownerBanner };
+
 export function createApp({ healthCheck = () => db.prepare('SELECT 1').get() } = {}) {
   const app = express();
   app.disable('x-powered-by');
@@ -132,11 +134,7 @@ export function createApp({ healthCheck = () => db.prepare('SELECT 1').get() } =
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const seeded = seedOwner();
   if (seeded) {
-    console.log('==============================================');
-    console.log('  Owner-Konto angelegt:');
-    console.log(`  Benutzer: ${seeded.username}`);
-    console.log(`  Passwort: ${seeded.password}`);
-    console.log('==============================================');
+    console.log(ownerBanner(seeded));
   }
   purgeExpiredSessions();
   setInterval(purgeExpiredSessions, 60 * 60 * 1000).unref();

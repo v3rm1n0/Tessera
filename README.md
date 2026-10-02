@@ -293,7 +293,7 @@ calls authenticate via the bearer token or the session cookie.
 ## Owner password recovery
 
 The credentials are only printed on the very first start (on the server:
-`journalctl -u tessera | grep -A3 'Owner-Konto'`). Reset at any time
+`journalctl -u tessera | grep -A3 'Owner account'`). Reset at any time
 with:
 
 ```sh

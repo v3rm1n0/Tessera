@@ -11,7 +11,9 @@
 #        sudo mkdir -p /opt/tessera
 #        sudo rsync -a --exclude node_modules --exclude data ./ /opt/tessera/
 #        cd /opt/tessera && sudo bun install --frozen-lockfile --production
-#   3. Optional secrets (initial owner password):
+#   3. Optional secrets (initial owner password). Without OWNER_PASSWORD a random
+#      one is generated and printed once, on the first start, to the journal:
+#        sudo journalctl -u tessera | grep -A3 'Owner account'
 #        echo 'OWNER_PASSWORD=change-me' | sudo tee /etc/tessera/env
 #        sudo chmod 600 /etc/tessera/env
 #   4. Enable:

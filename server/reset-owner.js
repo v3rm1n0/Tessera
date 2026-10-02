@@ -3,7 +3,7 @@
  * Usage: node server/reset-owner.js [new-password]
  * Without an argument a random password is generated and printed.
  */
-import { db, hashPassword, randomPassword } from './db.js';
+import { db, hashPassword, randomPassword, ownerBanner } from './db.js';
 import { runMigrations } from './migrate.js';
 import { MIN_PASSWORD } from './validate.js';
 
@@ -31,8 +31,4 @@ if (owner) {
   username = 'owner';
 }
 
-console.log('==============================================');
-console.log('  Owner-Passwort gesetzt:');
-console.log(`  Benutzer: ${username}`);
-console.log(`  Passwort: ${password}`);
-console.log('==============================================');
+console.log(ownerBanner({ username, password, heading: 'Owner password set' }));
