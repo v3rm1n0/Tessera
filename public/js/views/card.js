@@ -3,10 +3,11 @@ import { activeToken } from '../session.js';
 import { el } from '../app.js';
 import { CARD_W, CARD_H, drawCard, qrMatrix, shortCode } from '../card-render.js';
 import { loadVendor } from '../vendor.js';
+import { saveBlob } from '../download.js';
+import { safeName, filterTickets, scopeOptions, exportZip } from '../card-export.js';
 import { t } from '../i18n.js';
 
 const PLACEHOLDER_UUID = '00000000-0000-4000-8000-000000000000';
-const safe = s => s.replace(/[^\p{L}\p{N}_-]+/gu, '_');
 
 /** Admission-card editor (EVENT_ADMIN): defined once per event, exported as PNGs in a ZIP per ticket. */
 export async function renderCardEditor(content, eventId) {
@@ -134,15 +135,6 @@ export async function renderCardEditor(content, eventId) {
 
   const progress = el('span', { class: 'muted', style: 'font-size:13px' });
 
-  function download(blob, name) {
-    const url = URL.createObjectURL(blob);
-    const a = el('a', { href: url, download: name });
-    document.body.append(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
   const singleBtn = el('button', { class: 'btn secondary' }, t('card.previewPng'));
   singleBtn.addEventListener('click', () => {
     const off = document.createElement('canvas');
@@ -151,7 +143,7 @@ export async function renderCardEditor(content, eventId) {
       color: sample.color, title: titleInput.value, text: textInput.value,
       label: sample.label, code: shortCode(PLACEHOLDER_UUID), backdropImg, matrix: qrMatrix(PLACEHOLDER_UUID),
     });
-    off.toBlob(blob => download(blob, `Einlasskarte-${safe(cfg.event)}-${t('card.previewSuffix')}.png`), 'image/png');
+    off.toBlob(blob => saveBlob(blob, `Einlasskarte-${safeName(cfg.event)}-${t('card.previewSuffix')}.png`), 'image/png');
   });
 
   const xlsxCheckbox = el('input', { type: 'checkbox', id: 'incl-xlsx', style: 'width:auto;margin:0' });
@@ -160,55 +152,83 @@ export async function renderCardEditor(content, eventId) {
     style: 'display:flex;align-items:center;gap:8px;margin:0;color:var(--color-text-primary);cursor:pointer;font-size:13.5px',
   }, xlsxCheckbox, t('card.inclXlsx'));
 
-  const bulkBtn = el('button', { class: 'btn' },
-    cfg.total_tickets ? t('card.exportAll', { n: cfg.total_tickets }) : t('card.noUuids'));
+  // what to export: everything, one section (with its subsections), or one subsection
+  const options = scopeOptions(cfg.groups || []);
+  const optionLabel = o => {
+    const name = o.direct ? `${o.section} – ${t('card.noSubsection')}` : (o.subsection ? `${o.section} – ${o.subsection}` : o.section);
+    return `${name} (${o.count})`;
+  };
+  const scopeSelect = el('select', {},
+    el('option', { value: 'all' }, t('card.scopeAll', { n: cfg.total_tickets })),
+    ...options.map((o, i) => el('option', { value: String(i) }, optionLabel(o))));
+  const chosen = () => (scopeSelect.value === 'all' ? null : options[Number(scopeSelect.value)]);
+
+  const bulkBtn = el('button', { class: 'btn' });
+  function labelBulk() {
+    const option = chosen();
+    bulkBtn.textContent = cfg.total_tickets === 0 ? t('card.noUuids')
+      : option ? t('card.exportScope', { n: option.count }) : t('card.exportAll', { n: cfg.total_tickets });
+  }
+  labelBulk();
   bulkBtn.disabled = cfg.total_tickets === 0;
+  scopeSelect.addEventListener('change', labelBulk);
+
+  const cancelBtn = el('button', { class: 'btn secondary', type: 'button', hidden: '' }, t('common.cancel'));
+  let controller = null;
+  cancelBtn.addEventListener('click', () => controller?.abort());
+  function setBusy(busy) {
+    bulkBtn.disabled = busy;
+    scopeSelect.disabled = busy;
+    xlsxCheckbox.disabled = busy;
+    cancelBtn.hidden = !busy;
+  }
+
+  // one shared canvas for all cards: draw, then encode to PNG
+  const off = document.createElement('canvas');
+  off.width = CARD_W; off.height = CARD_H;
+  const offContext = off.getContext('2d');
+  const renderCard = tk => {
+    drawCard(offContext, {
+      color: tk.color, title: titleInput.value, text: textInput.value,
+      label: tk.subsection ? `${tk.section} – ${tk.subsection}` : tk.section,
+      code: shortCode(tk.uuid), backdropImg, matrix: qrMatrix(tk.uuid),
+    });
+    return new Promise((resolve, reject) => off.toBlob(blob => (blob ? resolve(blob) : reject(new Error('PNG encoding failed'))), 'image/png'));
+  };
+
   bulkBtn.addEventListener('click', async () => {
-    bulkBtn.disabled = true;
+    controller = new AbortController();
+    const { signal } = controller;
+    setBusy(true);
     progress.textContent = t('card.loadingUuids');
     try {
       await loadVendor('jszip').catch(() => { throw new Error(t('err.NETWORK')); });
-      const tickets = await api.get(`/api/events/${eventId}/card/tickets`);
+      const option = chosen();
+      const [all, sheets] = await Promise.all([
+        api.get(`/api/events/${eventId}/card/tickets`),
+        xlsxCheckbox.checked ? api.get(`/api/events/${eventId}/card/xlsx`) : { groups: [] },
+      ]);
+      const tickets = filterTickets(all, option?.scope);
       if (tickets.length === 0) { progress.textContent = t('card.noUuidsDot'); return; }
-      const zip = new window.JSZip();
-      const off = document.createElement('canvas');
-      off.width = CARD_W; off.height = CARD_H;
-      const octx = off.getContext('2d');
-      for (let i = 0; i < tickets.length; i++) {
-        const tk = tickets[i];
-        const label = tk.subsection ? `${tk.section} – ${tk.subsection}` : tk.section;
-        drawCard(octx, {
-          color: tk.color, title: titleInput.value, text: textInput.value,
-          label, code: shortCode(tk.uuid), backdropImg, matrix: qrMatrix(tk.uuid),
-        });
-        const blob = await new Promise(r => off.toBlob(r, 'image/png'));
-        const dir = tk.subsection
-          ? zip.folder(safe(tk.section)).folder(safe(tk.subsection))
-          : zip.folder(safe(tk.section));
-        dir.file(`${tk.uuid}.png`, blob);
-        progress.textContent = t('card.generating', { i: i + 1, total: tickets.length });
-        if (i % 8 === 0) await new Promise(r => setTimeout(r));
-      }
-      if (xlsxCheckbox.checked) {
-        progress.textContent = t('card.generatingXlsx');
-        const { groups } = await api.get(`/api/events/${eventId}/card/xlsx`);
-        for (const g of groups) {
-          const bytes = Uint8Array.from(atob(g.base64), c => c.charCodeAt(0));
-          const dir = g.subsection
-            ? zip.folder(safe(g.section)).folder(safe(g.subsection))
-            : zip.folder(safe(g.section));
-          dir.file('UUIDs.xlsx', bytes);
-        }
-      }
-      progress.textContent = t('card.packingZip');
-      const out = await zip.generateAsync({ type: 'blob' });
-      download(out, `Einlasskarten-${safe(cfg.event)}.zip`);
+      const archive = await exportZip({
+        tickets, renderCard, signal, JSZip: window.JSZip, xlsxGroups: sheets.groups,
+        onProgress: (done, total) => { progress.textContent = t('card.generating', { i: done, total }); },
+        onPack: () => { progress.textContent = t('card.packingZip'); },
+      });
+      const suffix = option ? `-${safeName(option.subsection ? `${option.section}-${option.subsection}` : option.section)}` : '';
+      saveBlob(archive, `Einlasskarten-${safeName(cfg.event)}${suffix}.zip`);
       progress.textContent = t('card.doneCount', { n: tickets.length });
     } catch (err) {
-      progress.textContent = '';
-      alert(err.message);
+      if (err.name === 'AbortError') {
+        progress.textContent = t('card.cancelled');
+      } else {
+        progress.textContent = '';
+        alert(err.message);
+      }
+    } finally {
+      setBusy(false);
+      controller = null;
     }
-    bulkBtn.disabled = false;
   });
 
   content.replaceChildren(
@@ -227,12 +247,14 @@ export async function renderCardEditor(content, eventId) {
           el('span', {}, t('card.backdrop')),
           el('div', { class: 'inline-form', style: 'flex-wrap:wrap' }, fileInput, uploadBtn, removeBtn)),
         el('p', { class: 'muted', style: 'font-size:12.5px' }, t('card.explain')),
+        el('label', { class: 'field' }, el('span', {}, t('card.scope')), scopeSelect),
         el('div', { style: 'margin:8px 0' }, xlsxLabel),
         el('div', { class: 'inline-form', style: 'flex-wrap:wrap;margin-top:6px' },
-          saveBtn, singleBtn, bulkBtn),
+          saveBtn, singleBtn, bulkBtn, cancelBtn),
         el('div', { style: 'margin-top:8px' }, progress)),
       el('div', { class: 'card-preview-wrap' }, canvas)));
 
   preview();
   loadBackdrop();
+  return () => controller?.abort(); // leaving the page ends a running export instead of downloading it later
 }

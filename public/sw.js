@@ -22,6 +22,7 @@ const PRECACHE = [
   '/js/app.js',
   '/js/bars.js',
   '/js/camera.js',
+  '/js/card-export.js',
   '/js/card-render.js',
   '/js/codes-query.js',
   '/js/download.js',

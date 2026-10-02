@@ -252,6 +252,10 @@ test('admission card is defined once per event (EVENT_ADMIN only)', async () => 
   const tickets = (await admin('GET', `/api/events/${eventId}/card/tickets`)).data;
   assert.equal(tickets.length, 5);
   assert.ok(tickets.every(t => /^#[0-9a-f]{6}$/i.test(t.color) && t.section === 'Audio Video'));
+  assert.ok(tickets.every(t => t.section_id === sectionId && t.subsection_id === null), 'tickets carry the ids a scope filter needs');
+  assert.deepEqual(cfg1.data.groups, [
+    { section_id: sectionId, section: 'Audio Video', subsection_id: null, subsection: null, count: 5 },
+  ]);
 
   // upload raw backdrop bytes
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -298,6 +302,8 @@ test('per-folder UUID excel groups by section and subsection', async () => {
   const direct = res.data.groups.find(g => g.section === 'Excel-Test' && !g.subsection);
   const subGrp = res.data.groups.find(g => g.section === 'Excel-Test' && g.subsection === 'Team A');
   assert.ok(direct && subGrp, 'a section-direct group and a subsection group');
+  assert.deepEqual([direct.section_id, direct.subsection_id], [sec.id, null]);
+  assert.deepEqual([subGrp.section_id, subGrp.subsection_id], [sec.id, sub.id]);
   for (const g of [direct, subGrp]) {
     const buf = Buffer.from(g.base64, 'base64');
     assert.equal(buf[0], 0x50); // 'P'
@@ -306,6 +312,31 @@ test('per-folder UUID excel groups by section and subsection', async () => {
   assert.equal((await owner('GET', `/api/events/${eventId}/card/xlsx`)).status, 403);
 
   await admin('DELETE', `/api/sections/${sec.id}`); // cleanup, cascades tickets + subsection
+});
+
+test('the card endpoint lists what can be exported, per section and subsection, with ids and counts', async () => {
+  const b = (await admin('POST', `/api/events/${eventId}/sections`, { name: 'Bühne' })).data;
+  const crewB = (await admin('POST', `/api/sections/${b.id}/subsections`, { name: 'crew b' })).data;
+  const crewA = (await admin('POST', `/api/sections/${b.id}/subsections`, { name: 'Crew A' })).data;
+  await admin('POST', `/api/sections/${b.id}/subsections`, { name: 'Empty' }); // nothing issued: not listed
+  await admin('POST', `/api/sections/${b.id}/tickets`, { count: 1 });
+  await admin('POST', `/api/sections/${b.id}/tickets`, { count: 2, subsection_id: crewB.id });
+  await admin('POST', `/api/sections/${b.id}/tickets`, { count: 3, subsection_id: crewA.id });
+
+  const { groups } = (await admin('GET', `/api/events/${eventId}/card`)).data;
+  const mine = groups.filter(g => g.section_id === b.id);
+  assert.deepEqual(mine, [
+    { section_id: b.id, section: 'Bühne', subsection_id: null, subsection: null, count: 1 },
+    { section_id: b.id, section: 'Bühne', subsection_id: crewA.id, subsection: 'Crew A', count: 3 },
+    { section_id: b.id, section: 'Bühne', subsection_id: crewB.id, subsection: 'crew b', count: 2 },
+  ], 'direct tickets first, then subsections in name order regardless of case');
+  assert.equal(groups.reduce((n, g) => n + g.count, 0), (await admin('GET', `/api/events/${eventId}/card`)).data.total_tickets);
+
+  const tickets = (await admin('GET', `/api/events/${eventId}/card/tickets`)).data.filter(t => t.section_id === b.id);
+  assert.equal(tickets.length, 6);
+  assert.equal(tickets.filter(t => t.subsection_id === crewA.id && t.subsection === 'Crew A').length, 3);
+
+  await admin('DELETE', `/api/sections/${b.id}`); // cleanup
 });
 
 test('sections, UUIDs and cards are EVENT_ADMIN-only', async () => {

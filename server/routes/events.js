@@ -219,12 +219,23 @@ eventsRouter.get('/events/:eventId/card', manage, requireEventAccess, (req, res)
     FROM sections s LEFT JOIN subsections sub ON sub.section_id = s.id
     WHERE s.event_id = ? ORDER BY s.name, sub.name LIMIT 1
   `).get(req.event.id);
+  // what can be exported: one entry per section/subsection that has codes (direct codes: subsection null)
+  const groups = db.prepare(`
+    SELECT s.id AS section_id, s.name AS section, sub.id AS subsection_id, sub.name AS subsection, COUNT(*) AS count
+    FROM tickets t
+    JOIN sections s ON s.id = t.section_id
+    LEFT JOIN subsections sub ON sub.id = t.subsection_id
+    WHERE s.event_id = ?
+    GROUP BY s.id, sub.id
+    ORDER BY s.name COLLATE NOCASE, sub.name COLLATE NOCASE
+  `).all(req.event.id);
   res.json({
     event: req.event.name,
     title: e.card_title,
     text: e.card_text,
     has_backdrop: !!e.card_backdrop_mime,
     total_tickets: total,
+    groups,
     sample: first
       ? { color: first.color, label: first.subsection ? `${first.section} – ${first.subsection}` : first.section }
       : null,
@@ -273,7 +284,7 @@ eventsRouter.delete('/events/:eventId/card/backdrop', manage, requireEventAccess
 /** Flat ticket list (with section color + label parts) for bulk card export. */
 eventsRouter.get('/events/:eventId/card/tickets', manage, requireEventAccess, (req, res) => {
   res.json(db.prepare(`
-    SELECT t.uuid, s.name AS section, s.color, sub.name AS subsection
+    SELECT t.uuid, s.id AS section_id, s.name AS section, s.color, t.subsection_id, sub.name AS subsection
     FROM tickets t
     JOIN sections s ON s.id = t.section_id
     LEFT JOIN subsections sub ON sub.id = t.subsection_id
@@ -298,7 +309,10 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
   for (const r of rows) {
     const key = `${r.section_id}|${r.subsection_id ?? ''}`;
     if (!groups.has(key)) {
-      groups.set(key, { section: r.section, subsection: r.subsection, tickets: [] });
+      groups.set(key, {
+        section_id: r.section_id, section: r.section,
+        subsection_id: r.subsection_id, subsection: r.subsection, tickets: [],
+      });
     }
     groups.get(key).tickets.push({ uuid: r.uuid, holder: r.holder });
   }
@@ -316,7 +330,11 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
     sheet.getRow(1).font = { bold: true };
     for (const t of g.tickets) sheet.addRow({ label, uuid: t.uuid, name: t.holder });
     const buf = await wb.xlsx.writeBuffer();
-    out.push({ section: g.section, subsection: g.subsection, base64: Buffer.from(buf).toString('base64') });
+    out.push({
+      section_id: g.section_id, section: g.section,
+      subsection_id: g.subsection_id, subsection: g.subsection,
+      base64: Buffer.from(buf).toString('base64'),
+    });
   }
   res.json({ groups: out });
 });
