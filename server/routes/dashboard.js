@@ -7,7 +7,7 @@ export const dashboardRouter = Router();
 const eventRoles = requireRole('EVENT_ADMIN', 'SCANNER');
 
 dashboardRouter.get('/events/:eventId/dashboard', eventRoles, requireEventAccess, (req, res) => {
-  const since = resetBoundary(req.event.reset_time);
+  const since = resetBoundary(req.event.reset_time, undefined, req.event.timezone);
   const sections = db.prepare(`
     SELECT s.id, s.name, s.color,
            (SELECT COUNT(*) FROM tickets t WHERE t.section_id = s.id) AS ticket_count,
@@ -24,7 +24,7 @@ dashboardRouter.get('/events/:eventId/dashboard', eventRoles, requireEventAccess
     .map(s => ({ ...s, subsections: JSON.parse(s.subsections) }));
 
   res.json({
-    event: { id: req.event.id, name: req.event.name, reset_time: req.event.reset_time },
+    event: { id: req.event.id, name: req.event.name, reset_time: req.event.reset_time, timezone: req.event.timezone },
     reset_boundary: since,
     total_sections: sections.length,
     total_scans_today: sections.reduce((sum, s) => sum + s.scans_today, 0),
@@ -34,7 +34,7 @@ dashboardRouter.get('/events/:eventId/dashboard', eventRoles, requireEventAccess
 
 /** Detail view: double-scanned codes of a section since the last reset. */
 dashboardRouter.get('/sections/:sectionId/doubles', eventRoles, requireSectionAccess, (req, res) => {
-  const since = resetBoundary(req.event.reset_time);
+  const since = resetBoundary(req.event.reset_time, undefined, req.event.timezone);
   const doubles = db.prepare(`
     SELECT sc.ticket_uuid AS uuid,
            sub.name AS subsection,

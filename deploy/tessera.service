@@ -50,6 +50,8 @@ Environment=HOST=127.0.0.1
 # trust the proxy's X-Forwarded-For header so login throttling sees real client addresses
 Environment=TRUST_PROXY=loopback
 Environment=DATA_DIR=/var/lib/tessera
+# The daily reset is read in each event's own time zone (set per event in the app), so the
+# server's TZ does not affect it.
 EnvironmentFile=-/etc/tessera/env
 
 Restart=always

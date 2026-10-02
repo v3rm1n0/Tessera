@@ -136,7 +136,12 @@ instantly, without a page reload.
    shows the double-scanned codes with their UUIDs.
 
 Daily counters always cover the period since the last elapsed reset time —
-the reset happens exactly at the configured time, without a cron job.
+the reset happens exactly at the configured time, without a cron job. The reset
+time is read on the wall clock of the event's own **time zone** (set next to the
+reset time; new events start in the server's zone), so a server running in UTC
+resets a Berlin event at Berlin midnight. Days around daylight-saving changes
+are 23 or 25 hours long. Changing the reset time or zone moves the current day
+window, so the app asks for confirmation.
 
 Double-scan protection: the client ignores repeated reads of the same code
 for 6 s; the server repeats the same OK response within 5 s instead of

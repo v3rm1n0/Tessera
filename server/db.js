@@ -4,6 +4,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { MIN_PASSWORD } from './validate.js';
+import { resetBoundary } from './time.js';
+
+export { resetBoundary };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -71,21 +74,11 @@ export function verifyPassword(password, stored) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-/** Timestamp (ms) of the most recent daily reset; "today" = scans with scanned_at >= this, so counts reset at the configured time without a cron job. */
-export function resetBoundary(resetTime, now = new Date()) {
-  const [h, m] = resetTime.split(':').map(Number);
-  const boundary = new Date(now);
-  boundary.setHours(h, m, 0, 0);
-  if (boundary.getTime() > now.getTime()) {
-    boundary.setDate(boundary.getDate() - 1);
-  }
-  return boundary.getTime();
-}
-
+/** Start of "today" for an event: its last reset time on the wall clock of its own time zone. */
 export function eventBoundary(eventId) {
-  const ev = db.prepare('SELECT reset_time FROM events WHERE id = ?').get(eventId);
+  const ev = db.prepare('SELECT reset_time, timezone FROM events WHERE id = ?').get(eventId);
   if (!ev) return null;
-  return resetBoundary(ev.reset_time);
+  return resetBoundary(ev.reset_time, new Date(), ev.timezone);
 }
 
 export function seedOwner() {

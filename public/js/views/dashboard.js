@@ -47,10 +47,21 @@ export async function renderDashboard(content) {
                   style: `background:${s.color}22;color:${s.color};border-color:${s.color}`,
                 }, String(s.scans_today))))),
       el('p', { class: 'muted', style: 'font-size:12.5px;margin-top:14px' },
-        t('dash.resetFooter', { time: data.event.reset_time, now: new Date().toLocaleTimeString(dateLocale()) })));
+        t('dash.resetFooter', {
+          time: data.event.reset_time, zone: data.event.timezone || 'server', now: clock(data.event.timezone),
+        })));
   }
 
   await load();
   const timer = setInterval(load, 15000);
   return () => clearInterval(timer);
+}
+
+/** Current time of day, on the wall clock of the event's zone when the browser knows it. */
+function clock(timeZone) {
+  try {
+    return new Date().toLocaleTimeString(dateLocale(), timeZone ? { timeZone } : undefined);
+  } catch {
+    return new Date().toLocaleTimeString(dateLocale());
+  }
 }

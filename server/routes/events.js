@@ -5,6 +5,7 @@ import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../errors.js';
+import { canonicalTimeZone } from '../time.js';
 import { uniqueSheetName } from '../xlsx.js';
 import { requireName } from '../validate.js';
 
@@ -12,14 +13,26 @@ import { requireName } from '../validate.js';
 export const eventsRouter = Router();
 const manage = requireRole('EVENT_ADMIN');
 
+const RESET_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Daily reset settings: the time of day and the IANA time zone it is read in (either or both). */
 eventsRouter.patch('/events/:eventId', manage, requireEventAccess, (req, res) => {
-  const resetTime = req.body?.reset_time;
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(resetTime || '')) {
-    throw new HttpError(400, 'RESET_TIME_INVALID');
+  const { reset_time: resetTime, timezone } = req.body || {};
+  if (resetTime === undefined && timezone === undefined) throw new HttpError(400, 'SETTINGS_REQUIRED');
+  const changes = {};
+  if (resetTime !== undefined) {
+    if (typeof resetTime !== 'string' || !RESET_TIME_RE.test(resetTime)) throw new HttpError(400, 'RESET_TIME_INVALID');
+    changes.reset_time = resetTime;
   }
-  db.prepare('UPDATE events SET reset_time = ? WHERE id = ?').run(resetTime, req.event.id);
-  audit(req, 'event.settings', { eventId: req.event.id, target: req.event.name, details: { reset_time: resetTime } });
-  res.json({ ...req.event, reset_time: resetTime });
+  if (timezone !== undefined) {
+    const zone = canonicalTimeZone(timezone);
+    if (!zone) throw new HttpError(400, 'TIMEZONE_INVALID');
+    changes.timezone = zone;
+  }
+  const next = { reset_time: req.event.reset_time, timezone: req.event.timezone, ...changes };
+  db.prepare('UPDATE events SET reset_time = ?, timezone = ? WHERE id = ?').run(next.reset_time, next.timezone, req.event.id);
+  audit(req, 'event.settings', { eventId: req.event.id, target: req.event.name, details: changes });
+  res.json({ ...req.event, ...next });
 });
 
 const COLOR_RE = /^#[0-9a-f]{6}$/i;

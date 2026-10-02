@@ -3,6 +3,7 @@ import { db, hashPassword, eventColumns } from '../db.js';
 import { requireRole } from '../auth.js';
 import { audit, listAudit } from '../audit.js';
 import { HttpError } from '../errors.js';
+import { serverTimeZone } from '../time.js';
 import { requireName, requireNewAccount } from '../validate.js';
 
 /** Owner-only administration: accounts, events, assignments. */
@@ -46,10 +47,11 @@ adminRouter.delete('/users/:id', (req, res) => {
 
 adminRouter.post('/events', (req, res) => {
   const name = requireName(req.body?.name);
-  const info = db.prepare('INSERT INTO events (name) VALUES (?)').run(name);
+  const timezone = serverTimeZone();
+  const info = db.prepare('INSERT INTO events (name, timezone) VALUES (?, ?)').run(name, timezone);
   const id = Number(info.lastInsertRowid);
   audit(req, 'event.create', { eventId: id, target: name });
-  res.status(201).json({ id, name, reset_time: '00:00' });
+  res.status(201).json({ id, name, reset_time: '00:00', timezone });
 });
 
 adminRouter.get('/events', (req, res) => {

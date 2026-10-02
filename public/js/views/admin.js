@@ -16,6 +16,13 @@ export async function renderAdmin(content) {
   await load();
 }
 
+/** Suggestions for the time zone field: every IANA zone the browser knows, plus UTC. */
+function zoneList() {
+  const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+  return el('datalist', { id: 'tz-list' },
+    ['UTC', ...zones.filter(zone => zone !== 'UTC')].map(zone => el('option', { value: zone })));
+}
+
 /** Fetches an authenticated file and saves it, so the session token never
  * appears in a URL (which would leak via logs, history and referrers). */
 async function download(url, filename) {
@@ -196,13 +203,21 @@ async function eventBlock(reload) {
   const dash = await api.get(`/api/events/${event.id}/dashboard`);
 
   const resetInput = el('input', { type: 'time', value: dash.event.reset_time, style: 'width:auto' });
-  const resetForm = el('form', { class: 'inline-form' },
-    resetInput,
+  const zoneInput = el('input', {
+    type: 'text', list: 'tz-list', value: dash.event.timezone || '', placeholder: 'Europe/Berlin',
+    autocomplete: 'off', spellcheck: 'false', 'aria-label': t('admin.timezone'), style: 'width:auto;min-width:210px',
+  });
+  const resetForm = el('form', { class: 'inline-form', style: 'flex-wrap:wrap' },
+    resetInput, zoneInput, zoneList(),
     el('button', { class: 'btn secondary', type: 'submit' }, t('admin.saveResetTime')));
   resetForm.addEventListener('submit', async e => {
     e.preventDefault();
+    const zone = zoneInput.value.trim();
+    const changed = resetInput.value !== dash.event.reset_time || (zone && zone !== dash.event.timezone);
+    // moving the day window changes what counts as "today" (and what is a duplicate) right away
+    if (changed && !confirm(t('admin.confirmResetChange'))) return;
     try {
-      await api.patch(`/api/events/${event.id}`, { reset_time: resetInput.value });
+      await api.patch(`/api/events/${event.id}`, { reset_time: resetInput.value, ...(zone ? { timezone: zone } : {}) });
       await refreshUser();
       reload();
     } catch (err) { flash(err); }
@@ -297,7 +312,8 @@ async function eventBlock(reload) {
     el('div', { class: 'card', style: 'margin-bottom:14px' },
       el('div', { class: 'label', style: 'margin-bottom:8px' },
         t('admin.dailyReset')),
-      resetForm),
+      resetForm,
+      el('p', { class: 'muted', style: 'font-size:12.5px;margin:8px 0 0' }, t('admin.resetHint'))),
     el('div', { class: 'card', style: 'margin-bottom:14px' },
       el('div', { class: 'label', style: 'margin-bottom:8px' }, t('admin.cardLabel')),
       el('div', { class: 'inline-form', style: 'flex-wrap:wrap' },

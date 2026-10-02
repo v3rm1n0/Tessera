@@ -162,6 +162,17 @@ export const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    id: '006-event-timezone',
+    up(db) {
+      addColumn(db, 'events', 'timezone', "TEXT NOT NULL DEFAULT ''");
+      // the reset time used to be read in the server's own zone; record that zone explicitly so
+      // existing events behave exactly as before and no longer depend on the server's TZ
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (zone) db.prepare("UPDATE events SET timezone = ? WHERE timezone = ''").run(zone);
+    },
+  },
 ];
 
 /** Applies every not-yet-applied migration in order, each in its own transaction; returns the applied ids. */

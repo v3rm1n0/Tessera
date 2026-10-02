@@ -32,6 +32,8 @@ export const CODES = {
   SUBSECTION_EXISTS: 'Subsection already exists',
   COLOR_INVALID: 'color must be in #rrggbb format',
   RESET_TIME_INVALID: 'reset_time must be in HH:MM format',
+  TIMEZONE_INVALID: 'timezone must be a valid IANA time zone such as Europe/Berlin',
+  SETTINGS_REQUIRED: 'Provide reset_time and/or timezone',
   COUNT_INVALID: 'count must be between 1 and 10000',
   SUBSECTION_MISMATCH: 'Subsection does not belong to this section',
   IMAGE_TYPE_INVALID: 'Only PNG, JPEG or WebP allowed',

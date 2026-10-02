@@ -21,6 +21,7 @@ test('runMigrations builds the full schema and is idempotent', () => {
   assert.ok(cols('sections').includes('color'));
   assert.ok(cols('tickets').includes('subsection_id'));
   assert.ok(cols('events').includes('card_title') && cols('events').includes('card_backdrop'));
+  assert.ok(cols('events').includes('timezone'));
 
   // a second run applies nothing
   assert.deepEqual(runMigrations(db), []);
@@ -47,4 +48,11 @@ test('runMigrations is safe on a legacy DB that already has the schema', () => {
   assert.match(db.prepare('SELECT color FROM sections WHERE id = 1').get().color, /^#[0-9a-f]{6}$/i);
   // existing data preserved
   assert.equal(db.prepare('SELECT name FROM events WHERE id = 1').get().name, 'Alt');
+
+  // the reset time used to be read in the server's zone; that zone is now recorded explicitly
+  const serverZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  assert.equal(db.prepare('SELECT timezone FROM events WHERE id = 1').get().timezone, serverZone);
+  db.prepare("UPDATE events SET timezone = 'UTC' WHERE id = 1").run();
+  assert.deepEqual(runMigrations(db), [], 'nothing runs twice');
+  assert.equal(db.prepare('SELECT timezone FROM events WHERE id = 1').get().timezone, 'UTC', 'a later choice is not overwritten');
 });

@@ -38,9 +38,9 @@ authRouter.post('/logout', (req, res) => {
 
 authRouter.get('/me', requireAuth, (req, res) => {
   const events = req.user.role === 'OWNER'
-    ? db.prepare('SELECT id, name, reset_time FROM events ORDER BY name').all()
+    ? db.prepare('SELECT id, name, reset_time, timezone FROM events ORDER BY name').all()
     : db.prepare(`
-        SELECT e.id, e.name, e.reset_time FROM events e
+        SELECT e.id, e.name, e.reset_time, e.timezone FROM events e
         JOIN event_assignments a ON a.event_id = e.id
         WHERE a.user_id = ? ORDER BY e.name
       `).all(req.user.id);
