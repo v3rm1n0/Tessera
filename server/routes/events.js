@@ -7,6 +7,7 @@ import { audit } from '../audit.js';
 import { HttpError } from '../errors.js';
 import { canonicalTimeZone } from '../time.js';
 import { uniqueSheetName } from '../xlsx.js';
+import { emptySheetName, excelHeaders, normalizeLang } from '../i18n.js';
 import { requireName } from '../validate.js';
 
 /** Event Admin functionality: sections, UUIDs and QR codes are managed exclusively by the event's admins. */
@@ -295,6 +296,7 @@ eventsRouter.get('/events/:eventId/card/tickets', manage, requireEventAccess, (r
 
 /** One UUID-list workbook per export folder (grouped by section/subsection), returned as base64 for the client to place. */
 eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async (req, res) => {
+  const headers = excelHeaders(req.query.lang, 'cardList');
   const rows = db.prepare(`
     SELECT t.uuid, t.holder, s.id AS section_id, s.name AS section,
            t.subsection_id, sub.name AS subsection
@@ -323,9 +325,9 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
     const wb = new ExcelJS.Workbook();
     const sheet = wb.addWorksheet('UUIDs');
     sheet.columns = [
-      { header: 'Section', key: 'label', width: 34 },
-      { header: 'UUID', key: 'uuid', width: 40 },
-      { header: 'Name (recipient)', key: 'name', width: 30 },
+      { header: headers[0], key: 'label', width: 34 },
+      { header: headers[1], key: 'uuid', width: 40 },
+      { header: headers[2], key: 'name', width: 30 },
     ];
     sheet.getRow(1).font = { bold: true };
     for (const t of g.tickets) sheet.addRow({ label, uuid: t.uuid, name: t.holder });
@@ -340,6 +342,8 @@ eventsRouter.get('/events/:eventId/card/xlsx', manage, requireEventAccess, async
 });
 
 eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, async (req, res) => {
+  const lang = normalizeLang(req.query.lang);
+  const headers = excelHeaders(lang, 'tickets');
   const sections = db.prepare('SELECT * FROM sections WHERE event_id = ? ORDER BY name')
     .all(req.event.id);
   const wb = new ExcelJS.Workbook();
@@ -347,11 +351,11 @@ eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, as
   for (const section of sections) {
     const sheet = wb.addWorksheet(uniqueSheetName(section.name, usedSheetNames));
     sheet.columns = [
-      { header: 'Section', key: 'section', width: 30 },
-      { header: 'Subsection', key: 'subsection', width: 30 },
-      { header: 'UUID', key: 'uuid', width: 40 },
-      { header: 'Created', key: 'created', width: 22 },
-      { header: 'Name (recipient)', key: 'name', width: 30 },
+      { header: headers[0], key: 'section', width: 30 },
+      { header: headers[1], key: 'subsection', width: 30 },
+      { header: headers[2], key: 'uuid', width: 40 },
+      { header: headers[3], key: 'created', width: 22 },
+      { header: headers[4], key: 'name', width: 30 },
     ];
     sheet.getRow(1).font = { bold: true };
     for (const t of sectionTickets(section.id)) {
@@ -364,7 +368,7 @@ eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, as
       });
     }
   }
-  if (sections.length === 0) wb.addWorksheet('Empty');
+  if (sections.length === 0) wb.addWorksheet(emptySheetName(lang));
   res.setHeader('Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition',

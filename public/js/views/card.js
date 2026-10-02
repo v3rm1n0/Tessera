@@ -5,7 +5,7 @@ import { CARD_W, CARD_H, drawCard, qrMatrix, shortCode } from '../card-render.js
 import { loadVendor } from '../vendor.js';
 import { saveBlob } from '../download.js';
 import { safeName, filterTickets, scopeOptions, exportZip, exportPdf } from '../card-export.js';
-import { t } from '../i18n.js';
+import { t, getLang } from '../i18n.js';
 
 const PLACEHOLDER_UUID = '00000000-0000-4000-8000-000000000000';
 
@@ -143,7 +143,7 @@ export async function renderCardEditor(content, eventId) {
       color: sample.color, title: titleInput.value, text: textInput.value,
       label: sample.label, code: shortCode(PLACEHOLDER_UUID), backdropImg, matrix: qrMatrix(PLACEHOLDER_UUID),
     });
-    off.toBlob(blob => saveBlob(blob, `Einlasskarte-${safeName(cfg.event)}-${t('card.previewSuffix')}.png`), 'image/png');
+    off.toBlob(blob => saveBlob(blob, `${t('card.fileOne')}-${safeName(cfg.event)}-${t('card.previewSuffix')}.png`), 'image/png');
   });
 
   const xlsxCheckbox = el('input', { type: 'checkbox', id: 'incl-xlsx', style: 'width:auto;margin:0' });
@@ -218,7 +218,7 @@ export async function renderCardEditor(content, eventId) {
       const option = chosen();
       const [all, sheets] = await Promise.all([
         api.get(`/api/events/${eventId}/card/tickets`),
-        !pdf && xlsxCheckbox.checked ? api.get(`/api/events/${eventId}/card/xlsx`) : { groups: [] },
+        !pdf && xlsxCheckbox.checked ? api.get(`/api/events/${eventId}/card/xlsx?lang=${getLang()}`) : { groups: [] },
       ]);
       const tickets = filterTickets(all, option?.scope);
       if (tickets.length === 0) { progress.textContent = t('card.noUuidsDot'); return; }
@@ -230,7 +230,7 @@ export async function renderCardEditor(content, eventId) {
           onPack: () => { progress.textContent = t('card.packingZip'); },
         });
       const suffix = option ? `-${safeName(option.subsection ? `${option.section}-${option.subsection}` : option.section)}` : '';
-      saveBlob(archive, `Einlasskarten-${safeName(cfg.event)}${suffix}.${pdf ? 'pdf' : 'zip'}`);
+      saveBlob(archive, `${t('card.fileBase')}-${safeName(cfg.event)}${suffix}.${pdf ? 'pdf' : 'zip'}`);
       progress.textContent = t('card.doneCount', { n: tickets.length });
     } catch (err) {
       if (err.name === 'AbortError') {

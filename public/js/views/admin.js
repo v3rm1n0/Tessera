@@ -3,7 +3,7 @@ import { downloadFile } from '../download.js';
 import { editableName, passwordInput } from '../ui.js';
 import { generatePassword } from '../password.js';
 import { el, state, currentEvent, refreshUser } from '../app.js';
-import { t, hasKey, dateLocale } from '../i18n.js';
+import { t, hasKey, dateLocale, getLang } from '../i18n.js';
 
 /** Administration: Owner manages accounts/events/assignments; Event Admin manages sections, UUIDs and reset time. */
 export async function renderAdmin(content) {
@@ -405,7 +405,7 @@ async function eventBlock(reload) {
         class: 'btn secondary sm',
         onclick: e => {
           e.preventDefault();
-          downloadFile(`/api/events/${event.id}/tickets.xlsx`, `uuids-event-${event.id}.xlsx`)
+          downloadFile(`/api/events/${event.id}/tickets.xlsx?lang=${getLang()}`, `uuids-event-${event.id}.xlsx`)
             .catch(flash);
         },
       }, t('admin.exportXlsx'))));
