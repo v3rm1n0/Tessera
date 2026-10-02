@@ -116,6 +116,12 @@ scanner on every scan) and can be revoked, e.g. when a badge is lost. A
 revoked code is refused with its own red "revoked" result and is not counted;
 restoring it makes it valid again. Codes are searched by UUID fragment or name.
 
+**Undoing a scan:** a scanner can take back their own scan for a minute after
+making it (`POST /api/scans/:id/void`), event admins can void any scan of their
+events. Voided scans stop counting everywhere, and the code can be scanned again;
+scan numbers are never reused within a day. A duplicate result also shows who
+scanned the code first.
+
 **Account switcher:** the area at the bottom of the sidebar lets several
 accounts be logged in at once ("Add account") and switched between with a
 click. Each account keeps its own session (bearer token).
@@ -171,6 +177,7 @@ POST   /api/sections/:id/tickets     { count: n, subsection_id? }
 GET    /api/sections/:id/tickets     GET /api/events/:id/tickets.xlsx
 GET    /api/events/:id/tickets       ?q=&section=&subsection=&status=&limit=&offset=   (Event Admin)
 PATCH  /api/tickets/:uuid            { holder?, revoked? }                           (Event Admin)
+POST   /api/scans/:id/void           take back a scan (own scan within 60 s; admins: any)
 GET    /api/events/:id/card          PUT { title, text }             (once per event)
 POST/GET/DELETE /api/events/:id/card/backdrop   (image upload, raw)
 GET    /api/events/:id/card/tickets  flat list for the PNG export

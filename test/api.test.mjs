@@ -172,10 +172,11 @@ test('daily reset boundary: scans before the boundary do not count', async () =>
   assert.equal(dash.data.total_scans_today, 1);          // only uuids[1] remains
   assert.equal(dash.data.sections[0].doubles_today, 0);  // double was "yesterday"
 
-  // after the reset, the same code scans OK again and numbering restarts fresh
+  // after the reset, the same code scans OK again; numbers continue after the highest one still
+  // counted today (#2 of uuids[1]; the backdated #1 is yesterday's), so the next one is #3
   const rescan = await admin('POST', '/api/scan', { code: uuids[0] });
   assert.equal(rescan.data.status, 'OK');
-  assert.equal(rescan.data.scan_number, 2);
+  assert.equal(rescan.data.scan_number, 3);
 });
 
 test('resetBoundary math', () => {

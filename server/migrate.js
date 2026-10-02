@@ -181,6 +181,15 @@ export const MIGRATIONS = [
       addColumn(db, 'tickets', 'revoked_at', 'INTEGER');
     },
   },
+
+  {
+    id: '008-scan-voids',
+    up(db) {
+      // a voided scan stays in the table (history, audit) but stops counting
+      addColumn(db, 'scans', 'voided_at', 'INTEGER');
+      addColumn(db, 'scans', 'voided_by', 'INTEGER REFERENCES users(id) ON DELETE SET NULL');
+    },
+  },
 ];
 
 /** Applies every not-yet-applied migration in order, each in its own transaction; returns the applied ids. */

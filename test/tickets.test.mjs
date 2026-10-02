@@ -44,7 +44,7 @@ test('the code list pages through every code of the event with a total', async (
 
   const item = first.data.items[0];
   assert.deepEqual(Object.keys(item).sort(), [
-    'color', 'created_at', 'holder', 'revoked_at', 'section', 'section_id', 'subsection', 'subsection_id', 'uuid',
+    'color', 'created_at', 'holder', 'revoked_at', 'scanned_today', 'section', 'section_id', 'subsection', 'subsection_id', 'uuid',
   ]);
   assert.equal(item.section, 'Alpha');
   assert.equal(item.holder, '');

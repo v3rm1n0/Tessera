@@ -12,9 +12,9 @@ dashboardRouter.get('/events/:eventId/dashboard', eventRoles, requireEventAccess
     SELECT s.id, s.name, s.color,
            (SELECT COUNT(*) FROM tickets t WHERE t.section_id = s.id) AS ticket_count,
            (SELECT COUNT(*) FROM scans sc
-             WHERE sc.section_id = s.id AND sc.result = 'OK' AND sc.scanned_at >= ?) AS scans_today,
+             WHERE sc.section_id = s.id AND sc.result = 'OK' AND sc.voided_at IS NULL AND sc.scanned_at >= ?) AS scans_today,
            (SELECT COUNT(DISTINCT sc.ticket_uuid) FROM scans sc
-             WHERE sc.section_id = s.id AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?) AS doubles_today,
+             WHERE sc.section_id = s.id AND sc.result = 'DOUBLE' AND sc.voided_at IS NULL AND sc.scanned_at >= ?) AS doubles_today,
            (SELECT json_group_array(json_object(
                 'id', sub.id, 'name', sub.name,
                 'ticket_count', (SELECT COUNT(*) FROM tickets t WHERE t.subsection_id = sub.id)))
@@ -43,7 +43,7 @@ dashboardRouter.get('/sections/:sectionId/doubles', eventRoles, requireSectionAc
     FROM scans sc
     JOIN tickets t ON t.uuid = sc.ticket_uuid
     LEFT JOIN subsections sub ON sub.id = t.subsection_id
-    WHERE sc.section_id = ? AND sc.result = 'DOUBLE' AND sc.scanned_at >= ?
+    WHERE sc.section_id = ? AND sc.result = 'DOUBLE' AND sc.voided_at IS NULL AND sc.scanned_at >= ?
     GROUP BY sc.ticket_uuid
     ORDER BY last_attempt_at DESC
   `).all(req.section.id, since);

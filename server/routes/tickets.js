@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import { db, resetBoundary } from '../db.js';
 import { requireRole, requireEventAccess, canAccessEvent } from '../auth.js';
 import { audit } from '../audit.js';
 import { normalizeUuid } from '../codes.js';
@@ -56,11 +56,15 @@ ticketsRouter.get('/events/:eventId/tickets', manage, requireEventAccess, (req, 
   const limit = Math.min(Math.max(Math.trunc(Number(req.query.limit)) || DEFAULT_PAGE, 1), MAX_PAGE);
   const offset = Math.max(Math.trunc(Number(req.query.offset)) || 0, 0);
   const total = db.prepare(`SELECT COUNT(*) AS n ${ITEM_FROM} WHERE ${where}`).get(...params).n;
-  const items = db.prepare(`
-    SELECT ${ITEM_COLUMNS} ${ITEM_FROM} WHERE ${where}
+  const since = resetBoundary(req.event.reset_time, undefined, req.event.timezone);
+  const rows = db.prepare(`
+    SELECT ${ITEM_COLUMNS},
+           EXISTS (SELECT 1 FROM scans sc WHERE sc.ticket_uuid = t.uuid AND sc.result = 'OK'
+                   AND sc.voided_at IS NULL AND sc.scanned_at >= ?) AS scanned_today
+    ${ITEM_FROM} WHERE ${where}
     ORDER BY s.name, sub.name, t.created_at, t.uuid LIMIT ? OFFSET ?
-  `).all(...params, limit, offset);
-  res.json({ total, items });
+  `).all(since, ...params, limit, offset);
+  res.json({ total, items: rows.map(row => ({ ...row, scanned_today: row.scanned_today === 1 })) });
 });
 
 ticketsRouter.patch('/tickets/:uuid', manage, (req, res) => {
