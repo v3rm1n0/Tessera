@@ -419,9 +419,20 @@ label.field > span { display: block; margin-bottom: var(--spacing-1-5); }
 }
 .scan-result .tap { margin-top: var(--spacing-4); color: rgba(255,255,255,0.7); font-size: var(--font-size-base); }
 .camera-error {
-  height: 100%; display: grid; place-items: center;
+  position: absolute; inset: 0; z-index: 4; background: #000;
+  display: grid; place-items: center;
   color: var(--color-text-secondary); text-align: center; padding: var(--spacing-8);
 }
+.camera-error .btn { margin-top: var(--spacing-3); }
+.camera-error[hidden], .torch-btn[hidden] { display: none; }
+.torch-btn {
+  position: absolute; bottom: var(--spacing-6); right: var(--spacing-4); z-index: 3;
+  width: 48px; height: 48px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(255,255,255,0.4);
+}
+.torch-btn .icon { width: 24px; height: 24px; }
+.torch-btn.on { background: #f5c518; color: #000; border-color: #f5c518; }
 
 /* ---------------------------------------------------------------- settings */
 
