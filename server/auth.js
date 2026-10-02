@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { db, verifyPassword, hashPassword } from './db.js';
+import { db, verifyPassword, hashPassword, getEvent } from './db.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 const COOKIE = 'tessera_session';
@@ -96,7 +96,7 @@ export function canAccessEvent(user, eventId) {
 
 export function requireEventAccess(req, res, next) {
   const eventId = Number(req.params.eventId);
-  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  const event = getEvent(eventId);
   if (!event) return res.status(404).json({ error: 'Event not found' });
   if (!canAccessEvent(req.user, eventId)) {
     return res.status(403).json({ error: 'Not authorized for this event' });
@@ -114,6 +114,6 @@ export function requireSectionAccess(req, res, next) {
     return res.status(403).json({ error: 'Not authorized for this event' });
   }
   req.section = section;
-  req.event = db.prepare('SELECT * FROM events WHERE id = ?').get(section.event_id);
+  req.event = getEvent(section.event_id);
   next();
 }

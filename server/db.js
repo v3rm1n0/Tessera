@@ -16,6 +16,26 @@ export const db = new DatabaseSync(
 // connection settings (the schema itself is created by server/migrate.js)
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 
+let eventColumnList = null;
+
+/**
+ * SELECT list with every column of `events` except the card backdrop BLOB, which must never ride
+ * along in JSON responses or be read on every request. Computed lazily so it reflects the migrated schema.
+ */
+export function eventColumns() {
+  if (!eventColumnList) {
+    eventColumnList = db.prepare('PRAGMA table_info(events)').all()
+      .map(column => column.name)
+      .filter(name => name !== 'card_backdrop')
+      .join(', ');
+  }
+  return eventColumnList;
+}
+
+export function getEvent(id) {
+  return db.prepare(`SELECT ${eventColumns()} FROM events WHERE id = ?`).get(id);
+}
+
 /** Distinct, dashboard-friendly palette for randomly assigned section colors. */
 export const SECTION_COLORS = [
   '#2dd4a7', '#4f9cf5', '#f5a94b', '#e46fc3', '#8f7ff7',

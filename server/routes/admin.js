@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db, hashPassword } from '../db.js';
+import { db, hashPassword, eventColumns } from '../db.js';
 import { requireRole } from '../auth.js';
 import { requireName, requireNewAccount } from '../validate.js';
 
@@ -46,7 +46,7 @@ adminRouter.post('/events', (req, res) => {
 });
 
 adminRouter.get('/events', (req, res) => {
-  res.json(db.prepare('SELECT * FROM events ORDER BY name').all());
+  res.json(db.prepare(`SELECT ${eventColumns()} FROM events ORDER BY name`).all());
 });
 
 adminRouter.delete('/events/:id', (req, res) => {
