@@ -1,7 +1,7 @@
-import { api } from './api.js';
+import { api, setUnauthorizedHandler } from './api.js';
 import {
   getAccounts, activeAccount, activeToken,
-  addAccount, switchAccount, removeActiveAccount,
+  addAccount, switchAccount, removeActiveAccount, dropAccount,
 } from './session.js';
 import { renderLogin } from './views/login.js';
 import { renderDashboard } from './views/dashboard.js';
@@ -34,7 +34,7 @@ export function selectEvent(id) {
 }
 
 export async function refreshUser() {
-  state.user = await api.get('/api/me');
+  state.user = await api.get('/api/me', { skipAuthHandler: true });
   const stored = Number(localStorage.getItem('tessera_event'));
   const events = state.user.events;
   state.eventId = events.some(e => e.id === stored) ? stored : ((events.find(e => !e.archived) ?? events[0])?.id ?? null);
@@ -198,16 +198,36 @@ function accountSwitcher() {
 }
 
 async function doLogout() {
-  try { await api.post('/api/logout'); } catch { /* session may already be dead */ }
+  try { await api.post('/api/logout', undefined, { skipAuthHandler: true }); } catch { /* session may already be dead */ }
   removeActiveAccount();
   state.user = null;
   route();
 }
 
+let pendingLogin = null; // { username, notice } for the login screen after a session ended
+let expiring = false;
+
+/** The active account's session is gone: forget it and ask for the password again, prefilled. */
+function sessionExpired() {
+  const name = activeAccount()?.username;
+  if (!name || expiring) return;
+  expiring = true;
+  dropAccount(name);
+  state.user = null;
+  pendingLogin = { username: name, notice: t('session.expired', { name }) };
+  route().finally(() => { expiring = false; });
+}
+setUnauthorizedHandler(sessionExpired);
+
 async function route() {
   cleanup?.();
   cleanup = null;
 
+  if (pendingLogin) {
+    const prefill = pendingLogin;
+    pendingLogin = null;
+    return showLogin(true, prefill);
+  }
   if (state.addingAccount) {
     state.addingAccount = false;
     return showLogin(true);
@@ -219,9 +239,11 @@ async function route() {
       await refreshUser();
     } catch (err) {
       if (err.status === 401) {
-        // stored session expired → drop it and fall through to the next account
-        removeActiveAccount();
-        continue;
+        // the stored session expired: ask for this account's password instead of silently
+        // showing a different account
+        const name = activeAccount().username;
+        dropAccount(name);
+        return showLogin(true, { username: name, notice: t('session.expired', { name }) });
       }
       return showLogin(false);
     }
@@ -241,14 +263,14 @@ async function route() {
   cleanup = await r.render(content, ...m.slice(1).map(Number)) || null;
 }
 
-function showLogin(cancelable) {
+function showLogin(cancelable, prefill = {}) {
   app.replaceChildren();
   renderLogin(app, result => {
     addAccount(result);
     state.user = null;
     location.hash = result.role === 'OWNER' ? '#/verwaltung' : '#/dashboard';
     route();
-  }, cancelable && activeAccount() ? () => { state.user = null; route(); } : null);
+  }, cancelable && activeAccount() ? () => { state.user = null; route(); } : null, prefill);
 }
 
 window.addEventListener('hashchange', route);

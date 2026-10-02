@@ -3,9 +3,10 @@ import { el } from '../app.js';
 import { renderSettingsControls } from '../settings.js';
 import { t } from '../i18n.js';
 
-export function renderLogin(root, onSuccess, onCancel = null) {
+/** `prefill`: { username, notice } when the screen is shown because a session ended. */
+export function renderLogin(root, onSuccess, onCancel = null, { username: prefilled = '', notice = '' } = {}) {
   const error = el('div', { class: 'error-text', style: 'display:none' });
-  const username = el('input', { type: 'text', autocomplete: 'username', required: '' });
+  const username = el('input', { type: 'text', autocomplete: 'username', required: '', value: prefilled });
   const password = el('input', { type: 'password', autocomplete: 'current-password', required: '' });
   const submit = el('button', { class: 'btn', type: 'submit', style: 'width:100%' }, t('login.submit'));
 
@@ -17,6 +18,7 @@ export function renderLogin(root, onSuccess, onCancel = null) {
     : null;
 
   const form = el('form', {},
+    notice ? el('div', { class: 'notice', role: 'status' }, notice) : null,
     el('label', { class: 'field' }, el('span', {}, t('login.username')), username),
     el('label', { class: 'field' }, el('span', {}, t('login.password')), password),
     error,
@@ -28,7 +30,7 @@ export function renderLogin(root, onSuccess, onCancel = null) {
     submit.disabled = true;
     error.style.display = 'none';
     try {
-      const result = await api.post('/api/login', { username: username.value, password: password.value });
+      const result = await api.post('/api/login', { username: username.value, password: password.value }, { skipAuthHandler: true });
       onSuccess(result);
     } catch (err) {
       error.textContent = err.message;
@@ -43,5 +45,5 @@ export function renderLogin(root, onSuccess, onCancel = null) {
         el('h1', {}, '⬢ Tessera'),
         form,
         el('div', { style: 'margin-top:18px' }, renderSettingsControls()))));
-  username.focus();
+  (prefilled ? password : username).focus();
 }

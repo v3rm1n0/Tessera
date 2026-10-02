@@ -364,6 +364,7 @@ label.field > span { display: block; margin-bottom: var(--spacing-1-5); }
   background: var(--color-background-surface); border: 1px solid var(--color-border);
   border-radius: var(--radius-container); padding: var(--spacing-7);
 }
+.login-card .notice { background: var(--color-warning-muted); color: var(--color-warning); border-radius: var(--radius-element); padding: var(--spacing-2) var(--spacing-3); margin-bottom: var(--spacing-3); font-size: var(--font-size-base); }
 .login-card h1 { font-size: var(--font-size-xl); margin: 0 0 var(--spacing-5); text-align: center; }
 
 /* ---------------------------------------------------------------- scanner */

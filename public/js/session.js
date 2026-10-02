@@ -33,6 +33,22 @@ export function switchAccount(username) {
   }
 }
 
+/**
+ * Forgets one account (its session ended). When it was the active one, the first remaining
+ * account becomes active so a "cancel" on the login screen lands somewhere. Returns { next }, the
+ * account that is active afterwards (or null).
+ */
+export function dropAccount(username) {
+  const wasActive = localStorage.getItem(ACTIVE) === username;
+  const rest = getAccounts().filter(a => a.username !== username);
+  save(rest);
+  if (wasActive) {
+    if (rest.length > 0) localStorage.setItem(ACTIVE, rest[0].username);
+    else localStorage.removeItem(ACTIVE);
+  }
+  return { next: activeAccount() };
+}
+
 /** Removes the active account; returns the next remaining account (or null). */
 export function removeActiveAccount() {
   const current = activeAccount();
