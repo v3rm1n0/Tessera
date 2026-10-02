@@ -9,6 +9,7 @@ export const CODES = {
   INVALID_REQUEST: 'Invalid request',
   UNSUPPORTED_MEDIA_TYPE: 'Unsupported media type',
   INTERNAL: 'Internal server error',
+  NOT_FOUND: 'Not found',
   CREDENTIALS_REQUIRED: 'Username and password are required',
   USERNAME_INVALID: 'Username must be 1-64 characters without control characters',
   PASSWORD_TOO_SHORT: 'Password must be at least 8 characters',

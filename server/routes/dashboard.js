@@ -4,9 +4,9 @@ import { requireRole, requireEventAccess, requireSectionAccess } from '../auth.j
 
 /** Dashboard data for event admins/scanners only; the owner has no access to day-to-day statistics. */
 export const dashboardRouter = Router();
-dashboardRouter.use(requireRole('EVENT_ADMIN', 'SCANNER'));
+const eventRoles = requireRole('EVENT_ADMIN', 'SCANNER');
 
-dashboardRouter.get('/events/:eventId/dashboard', requireEventAccess, (req, res) => {
+dashboardRouter.get('/events/:eventId/dashboard', eventRoles, requireEventAccess, (req, res) => {
   const since = resetBoundary(req.event.reset_time);
   const sections = db.prepare(`
     SELECT s.id, s.name, s.color,
@@ -33,7 +33,7 @@ dashboardRouter.get('/events/:eventId/dashboard', requireEventAccess, (req, res)
 });
 
 /** Detail view: double-scanned codes of a section since the last reset. */
-dashboardRouter.get('/sections/:sectionId/doubles', requireSectionAccess, (req, res) => {
+dashboardRouter.get('/sections/:sectionId/doubles', eventRoles, requireSectionAccess, (req, res) => {
   const since = resetBoundary(req.event.reset_time);
   const doubles = db.prepare(`
     SELECT sc.ticket_uuid AS uuid,

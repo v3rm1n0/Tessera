@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { db, seedOwner } from './db.js';
 import { runMigrations } from './migrate.js';
 import { sessionMiddleware } from './auth.js';
-import { errorHandler } from './errors.js';
+import { HttpError, errorHandler } from './errors.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { eventsRouter } from './routes/events.js';
@@ -50,12 +50,16 @@ export function createApp() {
   app.use('/api', eventsRouter);
   app.use('/api', dashboardRouter);
   app.use('/api', scanRouter);
+  // whatever is left under /api is a JSON 404, never the app shell
+  app.use('/api', (req, res, next) => next(new HttpError(404, 'NOT_FOUND')));
 
   app.use(express.static(path.join(__dirname, '..', 'public')));
-  // SPA fallback for client-side routes
-  app.get(/^\/(?!api\/).*/, (req, res) => {
+  // SPA fallback for client-side routes; a path with a file extension is a missing asset, not a route
+  app.get(/^\/(?!api(?:\/|$)).*/, (req, res, next) => {
+    if (path.extname(req.path)) return next();
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
   });
+  app.use((req, res) => res.status(404).type('text/plain').send('Not found'));
 
   app.use(errorHandler);
   return app;
