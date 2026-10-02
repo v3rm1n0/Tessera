@@ -75,7 +75,8 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname === '/sw.js') return;
+  // never answered from a cache: the API, the health probe, and the worker script itself
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname === '/healthz' || url.pathname === '/sw.js') return;
   event.respondWith(request.mode === 'navigate' ? loadPage(request, event) : staleWhileRevalidate(request, event));
 });
 

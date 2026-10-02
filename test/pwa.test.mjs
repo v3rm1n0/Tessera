@@ -185,6 +185,7 @@ test('the API, other origins and writes are left to the network', async () => {
   assert.equal((await sw.fetch({ url: 'https://elsewhere.test/js/app.js', method: 'GET', mode: 'cors' })).handled, false);
   assert.equal((await sw.fetch(page('/js/app.js', { method: 'POST' }))).handled, false);
   assert.equal((await sw.fetch(page('/sw.js'))).handled, false);
+  assert.equal((await sw.fetch(page('/healthz'))).handled, false, 'a health probe is never answered from a cache');
 });
 
 test('a static file comes from the cache at once and is refreshed in the background', async () => {

@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db, seedOwner } from './db.js';
@@ -15,6 +16,7 @@ import { reportsRouter } from './routes/reports.js';
 import { scanRouter } from './routes/scan.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { version: VERSION } = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
 // bring the schema up to date before the app (or any test) touches the db
 runMigrations(db);
@@ -59,12 +61,29 @@ export function resolveListen(env = process.env) {
   return { port: Number(env.PORT || 3000), host: env.HOST || undefined };
 }
 
-export function createApp() {
+/**
+ * `healthCheck` throws when the app cannot do its job; the default asks the database a question, so a
+ * database that is gone, locked or corrupt shows up in the probe.
+ */
+export function createApp({ healthCheck = () => db.prepare('SELECT 1').get() } = {}) {
   const app = express();
   app.disable('x-powered-by');
   const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   app.use(securityHeaders);
+
+  // for load balancers and uptime monitors: no login, and ahead of the session lookup so the probe
+  // cannot be broken by anything it is supposed to detect
+  app.get('/healthz', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      healthCheck();
+    } catch {
+      return res.status(503).json({ status: 'error' });
+    }
+    res.json({ status: 'ok', version: VERSION, uptime: Math.round(process.uptime()) });
+  });
+
   app.use(express.json({ limit: '1mb' }));
   app.use(sessionMiddleware);
 

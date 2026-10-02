@@ -194,6 +194,12 @@ and can be switched at any time — on the login screen and in the
 account-switcher menu. Preferences are stored per browser and apply
 instantly, without a page reload.
 
+## Health check
+
+`GET /healthz` needs no login and answers `{"status":"ok","version":"…","uptime":<seconds>}` (HTTP 200, never
+cached), or `{"status":"error"}` with HTTP 503 when the database does not answer a query. Point a
+load balancer or uptime monitor at it, e.g. `curl -fsS http://127.0.0.1:3000/healthz`.
+
 ## Backups
 
 `bun run backup` (or `node server/backup.js [dir] [--keep N]`) copies the database while the
