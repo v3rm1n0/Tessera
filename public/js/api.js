@@ -1,5 +1,11 @@
 import { activeToken } from './session.js';
-import { t } from './i18n.js';
+import { t, hasKey } from './i18n.js';
+
+/** Prefers the translation of the server's error code, then the server's own text. */
+function errorMessage(data, status) {
+  if (data?.code && hasKey(`err.${data.code}`)) return t(`err.${data.code}`);
+  return data?.error || t('common.error', { status });
+}
 
 async function request(method, url, body) {
   const token = activeToken();
@@ -14,8 +20,9 @@ async function request(method, url, body) {
   let data = null;
   try { data = await res.json(); } catch { /* non-JSON response */ }
   if (!res.ok) {
-    const err = new Error(data?.error || t('common.error', { status: res.status }));
+    const err = new Error(errorMessage(data, res.status));
     err.status = res.status;
+    err.code = data?.code;
     throw err;
   }
   return data;

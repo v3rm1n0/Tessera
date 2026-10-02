@@ -138,6 +138,9 @@ GET    /api/events/:id/dashboard     GET /api/sections/:id/doubles   (event role
 POST   /api/scan                     { code: "<uuid>" }              (event roles)
 ```
 
+Errors are JSON of the form `{ "error": "<English text>", "code": "<CODE>" }`; the
+web UI translates the `code` into the selected language.
+
 Downloads and the card background are fetched with the bearer token and handed
 to the browser from an in-memory blob, so the token never appears in a URL; all
 calls authenticate via the bearer token or the session cookie.

@@ -121,6 +121,11 @@ export const dict = {
     'card.backdrop': 'Hintergrundbild',
     'card.explain': 'Einmal definiert – gilt für alle Abteilungen. Hauptfarbe, QR-Code und Beschriftung (Abteilung – Unterabteilung) werden pro UUID automatisch eingesetzt.',
     'card.heading': 'Einlasskarte – {name}',
+    'err.INVALID_JSON': 'Ungültige Anfrage (kein gültiges JSON).',
+    'err.PAYLOAD_TOO_LARGE': 'Die Anfrage ist zu groß.',
+    'err.INVALID_REQUEST': 'Ungültige Anfrage.',
+    'err.UNSUPPORTED_MEDIA_TYPE': 'Nicht unterstütztes Dateiformat.',
+    'err.INTERNAL': 'Interner Serverfehler.',
   },
   en: {
     brand: 'Tessera',
@@ -242,6 +247,11 @@ export const dict = {
     'card.backdrop': 'Background image',
     'card.explain': 'Defined once — applies to all sections. Main color, QR code and label (Section – Subsection) are inserted automatically per UUID.',
     'card.heading': 'Admission card – {name}',
+    'err.INVALID_JSON': 'The request was not valid JSON.',
+    'err.PAYLOAD_TOO_LARGE': 'The request is too large.',
+    'err.INVALID_REQUEST': 'Invalid request.',
+    'err.UNSUPPORTED_MEDIA_TYPE': 'Unsupported file type.',
+    'err.INTERNAL': 'Internal server error.',
   },
 };
 
@@ -276,6 +286,11 @@ export function getLang() {
 
 export function t(key, params) {
   return translate(getLang(), key, params);
+}
+
+/** True when the current language has a translation for the key. */
+export function hasKey(key) {
+  return Object.hasOwn(dict[getLang()] || dict.de, key);
 }
 
 export function dateLocale() {

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { db, seedOwner } from './db.js';
 import { runMigrations } from './migrate.js';
 import { sessionMiddleware } from './auth.js';
+import { errorHandler } from './errors.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { eventsRouter } from './routes/events.js';
@@ -56,11 +57,7 @@ export function createApp() {
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
   });
 
-  // eslint-disable-next-line no-unused-vars
-  app.use((err, req, res, next) => {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  });
+  app.use(errorHandler);
   return app;
 }
 
