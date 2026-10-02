@@ -8,7 +8,8 @@ const SAME_CODE_COOLDOWN_MS = 6000; // ignore re-reads of the same code in this 
 
 /** Mobile scanning view: camera + jsQR + post-scan feedback states. */
 export async function renderScanner(content) {
-  const video = el('video', { playsinline: '', muted: '', autoplay: '' });
+  const video = el('video', { playsinline: '', autoplay: '' });
+  video.muted = true; // the property, not the attribute: only a muted video may start without a tap (page reload, app launch)
   const overlay = el('div', {});
   const view = el('div', { class: 'scanner-view' },
     video,
