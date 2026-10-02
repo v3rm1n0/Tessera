@@ -2,7 +2,7 @@ import { activeToken } from './session.js';
 import { t, hasKey } from './i18n.js';
 
 /** Prefers the translation of the server's error code, then the server's own text. */
-function errorMessage(data, status) {
+export function errorMessage(data, status) {
   if (data?.code && hasKey(`err.${data.code}`)) return t(`err.${data.code}`);
   return data?.error || t('common.error', { status });
 }

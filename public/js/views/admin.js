@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { activeToken } from '../session.js';
+import { downloadFile } from '../download.js';
 import { el, state, currentEvent, refreshUser } from '../app.js';
 import { t, hasKey, dateLocale } from '../i18n.js';
 
@@ -21,19 +21,6 @@ function zoneList() {
   const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
   return el('datalist', { id: 'tz-list' },
     ['UTC', ...zones.filter(zone => zone !== 'UTC')].map(zone => el('option', { value: zone })));
-}
-
-/** Fetches an authenticated file and saves it, so the session token never
- * appears in a URL (which would leak via logs, history and referrers). */
-async function download(url, filename) {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${activeToken()}` } });
-  if (!res.ok) throw new Error(t('common.error', { status: res.status }));
-  const blobUrl = URL.createObjectURL(await res.blob());
-  const a = el('a', { href: blobUrl, download: filename });
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(blobUrl);
 }
 
 function flash(err) {
@@ -333,7 +320,7 @@ async function eventBlock(reload) {
         class: 'btn secondary sm',
         onclick: e => {
           e.preventDefault();
-          download(`/api/events/${event.id}/tickets.xlsx`, `uuids-event-${event.id}.xlsx`)
+          downloadFile(`/api/events/${event.id}/tickets.xlsx`, `uuids-event-${event.id}.xlsx`)
             .catch(flash);
         },
       }, t('admin.exportXlsx'))));
