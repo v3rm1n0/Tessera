@@ -24,6 +24,8 @@ test('runMigrations builds the full schema and is idempotent', () => {
   assert.ok(cols('events').includes('timezone'));
   assert.ok(cols('tickets').includes('holder') && cols('tickets').includes('revoked_at'));
   assert.ok(cols('scans').includes('voided_at') && cols('scans').includes('voided_by'));
+  const indexes = db.prepare('PRAGMA index_list(tickets)').all().map(i => i.name);
+  assert.ok(indexes.includes('idx_tickets_subsection'));
 
   // a second run applies nothing
   assert.deepEqual(runMigrations(db), []);

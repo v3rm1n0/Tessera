@@ -38,7 +38,8 @@ export async function renderDashboard(content) {
                 el('span', { class: 'color-dot', style: `background:${s.color}` }),
                 el('div', { class: 'grow' },
                   el('div', { class: 'title' }, s.name),
-                  el('div', { class: 'sub' }, t('dash.codes', { n: s.ticket_count }))),
+                  el('div', { class: 'sub' }, t('dash.codes', { n: s.ticket_count })),
+                  subsectionChips(s)),
                 s.doubles_today > 0
                   ? el('span', { class: 'badge warn', title: t('dash.doubleTitle') }, String(s.doubles_today))
                   : null,
@@ -64,4 +65,18 @@ function clock(timeZone) {
   } catch {
     return new Date().toLocaleTimeString(dateLocale());
   }
+}
+
+/** Per-subsection progress ("name scans/codes") under a section row; nothing for sections without subsections. */
+function subsectionChips(s) {
+  if (s.subsections.length === 0) return null;
+  const chips = s.subsections.map(sub => ({ name: sub.name, scans: sub.scans_today, codes: sub.ticket_count }));
+  const directCodes = s.ticket_count - s.subsections.reduce((n, sub) => n + sub.ticket_count, 0);
+  if (directCodes > 0) {
+    const directScans = s.scans_today - s.subsections.reduce((n, sub) => n + sub.scans_today, 0);
+    chips.push({ name: t('admin.noSubsection'), scans: directScans, codes: directCodes });
+  }
+  return el('div', { class: 'chips' }, chips.map(c =>
+    el('span', { class: 'chip', title: t('dash.chipTitle', c) },
+      `${c.name} `, el('strong', {}, String(c.scans)), `/${c.codes}`)));
 }

@@ -17,10 +17,14 @@ dashboardRouter.get('/events/:eventId/dashboard', eventRoles, requireEventAccess
              WHERE sc.section_id = s.id AND sc.result = 'DOUBLE' AND sc.voided_at IS NULL AND sc.scanned_at >= ?) AS doubles_today,
            (SELECT json_group_array(json_object(
                 'id', sub.id, 'name', sub.name,
-                'ticket_count', (SELECT COUNT(*) FROM tickets t WHERE t.subsection_id = sub.id)))
+                'ticket_count', (SELECT COUNT(*) FROM tickets t WHERE t.subsection_id = sub.id),
+                'scans_today', (SELECT COUNT(*) FROM scans sc JOIN tickets t ON t.uuid = sc.ticket_uuid
+                  WHERE t.subsection_id = sub.id AND sc.result = 'OK' AND sc.voided_at IS NULL
+                    AND sc.scanned_at >= ?))
+                ORDER BY sub.name COLLATE NOCASE)
              FROM subsections sub WHERE sub.section_id = s.id) AS subsections
     FROM sections s WHERE s.event_id = ? ORDER BY s.name
-  `).all(since, since, req.event.id)
+  `).all(since, since, since, req.event.id)
     .map(s => ({ ...s, subsections: JSON.parse(s.subsections) }));
 
   res.json({

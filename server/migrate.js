@@ -190,6 +190,14 @@ export const MIGRATIONS = [
       addColumn(db, 'scans', 'voided_by', 'INTEGER REFERENCES users(id) ON DELETE SET NULL');
     },
   },
+
+  {
+    id: '009-ticket-subsection-index',
+    up(db) {
+      // per-subsection counts on the dashboard look tickets up by subsection
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_subsection ON tickets(subsection_id)');
+    },
+  },
 ];
 
 /** Applies every not-yet-applied migration in order, each in its own transaction; returns the applied ids. */

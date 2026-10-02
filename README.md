@@ -122,6 +122,9 @@ events. Voided scans stop counting everywhere, and the code can be scanned again
 scan numbers are never reused within a day. A duplicate result also shows who
 scanned the code first.
 
+On the dashboard every section with subsections also shows how far each
+subsection is (scans today / codes issued).
+
 **Account switcher:** the area at the bottom of the sidebar lets several
 accounts be logged in at once ("Add account") and switched between with a
 click. Each account keeps its own session (bearer token).
