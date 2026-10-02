@@ -4,7 +4,7 @@ import { el } from '../app.js';
 import { CARD_W, CARD_H, drawCard, qrMatrix, shortCode } from '../card-render.js';
 import { loadVendor } from '../vendor.js';
 import { saveBlob } from '../download.js';
-import { safeName, filterTickets, scopeOptions, exportZip } from '../card-export.js';
+import { safeName, filterTickets, scopeOptions, exportZip, exportPdf } from '../card-export.js';
 import { t } from '../i18n.js';
 
 const PLACEHOLDER_UUID = '00000000-0000-4000-8000-000000000000';
@@ -163,15 +163,24 @@ export async function renderCardEditor(content, eventId) {
     ...options.map((o, i) => el('option', { value: String(i) }, optionLabel(o))));
   const chosen = () => (scopeSelect.value === 'all' ? null : options[Number(scopeSelect.value)]);
 
+  // PNG files in a ZIP (for the printer's own workflow), or ready-to-print sheets
+  const formatSelect = el('select', {},
+    el('option', { value: 'zip' }, t('card.formatZip')),
+    el('option', { value: 'pdf' }, t('card.formatPdf')));
+
   const bulkBtn = el('button', { class: 'btn' });
   function labelBulk() {
     const option = chosen();
+    const pdf = formatSelect.value === 'pdf';
     bulkBtn.textContent = cfg.total_tickets === 0 ? t('card.noUuids')
-      : option ? t('card.exportScope', { n: option.count }) : t('card.exportAll', { n: cfg.total_tickets });
+      : option ? t(pdf ? 'card.exportScopePdf' : 'card.exportScope', { n: option.count })
+        : t(pdf ? 'card.exportAllPdf' : 'card.exportAll', { n: cfg.total_tickets });
+    xlsxLabel.style.display = pdf ? 'none' : 'flex'; // the code lists belong in the ZIP
   }
   labelBulk();
   bulkBtn.disabled = cfg.total_tickets === 0;
   scopeSelect.addEventListener('change', labelBulk);
+  formatSelect.addEventListener('change', labelBulk);
 
   const cancelBtn = el('button', { class: 'btn secondary', type: 'button', hidden: '' }, t('common.cancel'));
   let controller = null;
@@ -179,22 +188,24 @@ export async function renderCardEditor(content, eventId) {
   function setBusy(busy) {
     bulkBtn.disabled = busy;
     scopeSelect.disabled = busy;
+    formatSelect.disabled = busy;
     xlsxCheckbox.disabled = busy;
     cancelBtn.hidden = !busy;
   }
 
-  // one shared canvas for all cards: draw, then encode to PNG
+  // one shared canvas for all cards: draw, then encode
   const off = document.createElement('canvas');
   off.width = CARD_W; off.height = CARD_H;
   const offContext = off.getContext('2d');
-  const renderCard = tk => {
-    drawCard(offContext, {
-      color: tk.color, title: titleInput.value, text: textInput.value,
-      label: tk.subsection ? `${tk.section} – ${tk.subsection}` : tk.section,
-      code: shortCode(tk.uuid), backdropImg, matrix: qrMatrix(tk.uuid),
-    });
-    return new Promise((resolve, reject) => off.toBlob(blob => (blob ? resolve(blob) : reject(new Error('PNG encoding failed'))), 'image/png'));
-  };
+  const draw = tk => drawCard(offContext, {
+    color: tk.color, title: titleInput.value, text: textInput.value,
+    label: tk.subsection ? `${tk.section} – ${tk.subsection}` : tk.section,
+    code: shortCode(tk.uuid), backdropImg, matrix: qrMatrix(tk.uuid),
+  });
+  const encode = (type, quality) => new Promise((resolve, reject) =>
+    off.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Image encoding failed'))), type, quality));
+  const renderCard = tk => { draw(tk); return encode('image/png'); };
+  const renderJpeg = async tk => { draw(tk); return new Uint8Array(await (await encode('image/jpeg', 0.92)).arrayBuffer()); };
 
   bulkBtn.addEventListener('click', async () => {
     controller = new AbortController();
@@ -202,21 +213,24 @@ export async function renderCardEditor(content, eventId) {
     setBusy(true);
     progress.textContent = t('card.loadingUuids');
     try {
-      await loadVendor('jszip').catch(() => { throw new Error(t('err.NETWORK')); });
+      const pdf = formatSelect.value === 'pdf';
+      if (!pdf) await loadVendor('jszip').catch(() => { throw new Error(t('err.NETWORK')); });
       const option = chosen();
       const [all, sheets] = await Promise.all([
         api.get(`/api/events/${eventId}/card/tickets`),
-        xlsxCheckbox.checked ? api.get(`/api/events/${eventId}/card/xlsx`) : { groups: [] },
+        !pdf && xlsxCheckbox.checked ? api.get(`/api/events/${eventId}/card/xlsx`) : { groups: [] },
       ]);
       const tickets = filterTickets(all, option?.scope);
       if (tickets.length === 0) { progress.textContent = t('card.noUuidsDot'); return; }
-      const archive = await exportZip({
-        tickets, renderCard, signal, JSZip: window.JSZip, xlsxGroups: sheets.groups,
-        onProgress: (done, total) => { progress.textContent = t('card.generating', { i: done, total }); },
-        onPack: () => { progress.textContent = t('card.packingZip'); },
-      });
+      const onProgress = (done, total) => { progress.textContent = t('card.generating', { i: done, total }); };
+      const archive = pdf
+        ? new Blob([await exportPdf({ tickets, renderJpeg, signal, onProgress })], { type: 'application/pdf' })
+        : await exportZip({
+          tickets, renderCard, signal, JSZip: window.JSZip, xlsxGroups: sheets.groups, onProgress,
+          onPack: () => { progress.textContent = t('card.packingZip'); },
+        });
       const suffix = option ? `-${safeName(option.subsection ? `${option.section}-${option.subsection}` : option.section)}` : '';
-      saveBlob(archive, `Einlasskarten-${safeName(cfg.event)}${suffix}.zip`);
+      saveBlob(archive, `Einlasskarten-${safeName(cfg.event)}${suffix}.${pdf ? 'pdf' : 'zip'}`);
       progress.textContent = t('card.doneCount', { n: tickets.length });
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -248,6 +262,7 @@ export async function renderCardEditor(content, eventId) {
           el('div', { class: 'inline-form', style: 'flex-wrap:wrap' }, fileInput, uploadBtn, removeBtn)),
         el('p', { class: 'muted', style: 'font-size:12.5px' }, t('card.explain')),
         el('label', { class: 'field' }, el('span', {}, t('card.scope')), scopeSelect),
+        el('label', { class: 'field' }, el('span', {}, t('card.format')), formatSelect),
         el('div', { style: 'margin:8px 0' }, xlsxLabel),
         el('div', { class: 'inline-form', style: 'flex-wrap:wrap;margin-top:6px' },
           saveBtn, singleBtn, bulkBtn, cancelBtn),

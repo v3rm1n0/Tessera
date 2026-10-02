@@ -1,5 +1,7 @@
 // Builds the admission-card export: which cards, in which folders, with progress and cancel.
 // Free of the DOM (the caller supplies the renderer and JSZip), so it can be tested in node.
+import { CARD_W, CARD_H } from './card-render.js';
+import { sheetLayout, buildPdf, jpegInfo, PAGE_W, PAGE_H } from './pdf.js';
 
 /** A name that is safe as a folder or file name on every system. */
 export const safeName = name => String(name ?? '').replace(/[^\p{L}\p{N}_-]+/gu, '_') || '_';
@@ -116,4 +118,30 @@ export async function exportZip({ tickets, renderCard, JSZip, signal, onProgress
   const archive = await zip.generateAsync({ type: typeof Blob === 'undefined' ? 'uint8array' : 'blob' });
   stop();
   return archive;
+}
+
+/**
+ * Print sheets: every ticket rendered with `renderJpeg(ticket) -> JPEG bytes`, six cards to an A4 page with a
+ * cut line around each, as the bytes of one PDF. Cancel and progress work as in `exportZip`.
+ */
+export async function exportPdf({ tickets, renderJpeg, signal, onProgress = () => {} }) {
+  const stop = () => { if (signal?.aborted) throw cancelled(); };
+  const layout = sheetLayout({ count: tickets.length, aspect: CARD_H / CARD_W });
+  const pages = [];
+
+  for (let i = 0; i < tickets.length; i++) {
+    stop();
+    const jpeg = await renderJpeg(tickets[i]);
+    stop();
+    const { width, height, components } = jpegInfo(jpeg);
+    const { page, x, y, w, h } = layout[i];
+    pages[page] ??= { width: PAGE_W, height: PAGE_H, images: [], rects: [] };
+    pages[page].images.push({ jpeg, pxW: width, pxH: height, components, x, y, w, h });
+    pages[page].rects.push({ x, y, w, h });
+    onProgress(i + 1, tickets.length);
+    if (i % 8 === 7) await breathe();
+  }
+
+  stop();
+  return buildPdf(pages);
 }

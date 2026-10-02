@@ -29,6 +29,7 @@ const PRECACHE = [
   '/js/i18n.js',
   '/js/icons.js',
   '/js/password.js',
+  '/js/pdf.js',
   '/js/scan-result.js',
   '/js/session.js',
   '/js/settings.js',
