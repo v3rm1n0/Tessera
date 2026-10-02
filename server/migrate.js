@@ -173,6 +173,14 @@ export const MIGRATIONS = [
       if (zone) db.prepare("UPDATE events SET timezone = ? WHERE timezone = ''").run(zone);
     },
   },
+
+  {
+    id: '007-ticket-holder-revoked',
+    up(db) {
+      addColumn(db, 'tickets', 'holder', "TEXT NOT NULL DEFAULT ''");
+      addColumn(db, 'tickets', 'revoked_at', 'INTEGER');
+    },
+  },
 ];
 
 /** Applies every not-yet-applied migration in order, each in its own transaction; returns the applied ids. */

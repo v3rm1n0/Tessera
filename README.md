@@ -111,6 +111,11 @@ received which UUID.
 subsections, code generation, deletions, event settings) are recorded with who did
 them and shown to the Owner under Administration → Activity (`GET /api/admin/audit`).
 
+**Holders and revoking:** a code can carry the holder's name (shown to the
+scanner on every scan) and can be revoked, e.g. when a badge is lost. A
+revoked code is refused with its own red "revoked" result and is not counted;
+restoring it makes it valid again. Codes are searched by UUID fragment or name.
+
 **Account switcher:** the area at the bottom of the sidebar lets several
 accounts be logged in at once ("Add account") and switched between with a
 click. Each account keeps its own session (bearer token).
@@ -164,6 +169,8 @@ POST   /api/sections/:id/subsections { name }
 GET/DELETE subsections likewise
 POST   /api/sections/:id/tickets     { count: n, subsection_id? }
 GET    /api/sections/:id/tickets     GET /api/events/:id/tickets.xlsx
+GET    /api/events/:id/tickets       ?q=&section=&subsection=&status=&limit=&offset=   (Event Admin)
+PATCH  /api/tickets/:uuid            { holder?, revoked? }                           (Event Admin)
 GET    /api/events/:id/card          PUT { title, text }             (once per event)
 POST/GET/DELETE /api/events/:id/card/backdrop   (image upload, raw)
 GET    /api/events/:id/card/tickets  flat list for the PNG export

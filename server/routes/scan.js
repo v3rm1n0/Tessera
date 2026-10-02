@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db, eventBoundary } from '../db.js';
 import { requireRole, canAccessEvent } from '../auth.js';
 import { CODES } from '../errors.js';
+import { UUID_RE } from '../codes.js';
 
 export const scanRouter = Router();
 
@@ -11,7 +12,8 @@ const DEBOUNCE_MS = 5000;
 /** Scan problems are 200 responses with a status the scanner UI renders; the code lets it translate them. */
 const scanError = code => ({ status: 'ERROR', code, message: CODES[code] });
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The holder's name belongs in a scan response only when there is one. */
+const holderField = ticket => (ticket.holder ? { holder: ticket.holder } : {});
 
 scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   const code = String(req.body?.code || '').trim().toLowerCase();
@@ -20,7 +22,7 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   }
 
   const ticket = db.prepare(`
-    SELECT t.uuid, t.section_id, s.event_id,
+    SELECT t.uuid, t.section_id, t.holder, t.revoked_at, s.event_id,
            CASE WHEN sub.name IS NULL THEN s.name
                 ELSE s.name || ' – ' || sub.name END AS section_name
     FROM tickets t
@@ -33,6 +35,13 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
   }
   if (!canAccessEvent(req.user, ticket.event_id)) {
     return res.json(scanError('NOT_AUTHORIZED_EVENT'));
+  }
+  if (ticket.revoked_at) {
+    // a revoked code is refused outright and not recorded as a scan
+    return res.json({
+      status: 'REVOKED', code: 'CODE_REVOKED', message: CODES.CODE_REVOKED,
+      uuid: ticket.uuid, section: ticket.section_name, ...holderField(ticket),
+    });
   }
 
   const since = eventBoundary(ticket.event_id);
@@ -53,6 +62,7 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
         scan_number: prev.scan_number,
         uuid: ticket.uuid,
         section: ticket.section_name,
+        ...holderField(ticket),
       });
     }
 
@@ -67,6 +77,7 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
         uuid: ticket.uuid,
         section: ticket.section_name,
         first_scanned_at: prev.scanned_at,
+        ...holderField(ticket),
         message: `Code already scanned: ${ticket.uuid}`,
       });
     }
@@ -88,6 +99,7 @@ scanRouter.post('/scan', requireRole('EVENT_ADMIN', 'SCANNER'), (req, res) => {
       scan_number: scanNumber,
       uuid: ticket.uuid,
       section: ticket.section_name,
+      ...holderField(ticket),
     });
   } catch (e) {
     db.exec('ROLLBACK');

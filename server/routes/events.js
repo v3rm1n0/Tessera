@@ -157,7 +157,7 @@ eventsRouter.post('/sections/:sectionId/tickets', manage, requireSectionAccess, 
 
 function sectionTickets(sectionId) {
   return db.prepare(`
-    SELECT t.uuid, t.created_at, sub.name AS subsection
+    SELECT t.uuid, t.created_at, sub.name AS subsection, t.holder, t.revoked_at
     FROM tickets t LEFT JOIN subsections sub ON sub.id = t.subsection_id
     WHERE t.section_id = ? ORDER BY t.created_at, t.uuid
   `).all(sectionId);

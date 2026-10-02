@@ -8,6 +8,7 @@ import { HttpError, errorHandler } from './errors.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { eventsRouter } from './routes/events.js';
+import { ticketsRouter } from './routes/tickets.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { scanRouter } from './routes/scan.js';
 
@@ -68,6 +69,7 @@ export function createApp() {
   app.use('/api', authRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api', eventsRouter);
+  app.use('/api', ticketsRouter);
   app.use('/api', dashboardRouter);
   app.use('/api', scanRouter);
   // whatever is left under /api is a JSON 404, never the app shell

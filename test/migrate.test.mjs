@@ -22,6 +22,7 @@ test('runMigrations builds the full schema and is idempotent', () => {
   assert.ok(cols('tickets').includes('subsection_id'));
   assert.ok(cols('events').includes('card_title') && cols('events').includes('card_backdrop'));
   assert.ok(cols('events').includes('timezone'));
+  assert.ok(cols('tickets').includes('holder') && cols('tickets').includes('revoked_at'));
 
   // a second run applies nothing
   assert.deepEqual(runMigrations(db), []);
