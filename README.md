@@ -134,6 +134,10 @@ next, in the event's time zone) with its scan total, duplicates, the activity pe
 section and a bar chart of entries per hour — yesterday's numbers no longer
 disappear at the reset.
 
+**Codes view:** event admins find any code by UUID fragment or holder name,
+filter by section or state, edit holder names inline, revoke or restore codes,
+open a code's scan history (and undo single scans) and import names from a sheet.
+
 **Account switcher:** the area at the bottom of the sidebar lets several
 accounts be logged in at once ("Add account") and switched between with a
 click. Each account keeps its own session (bearer token).

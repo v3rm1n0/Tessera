@@ -7,15 +7,15 @@ function errorMessage(data, status) {
   return data?.error || t('common.error', { status });
 }
 
-async function request(method, url, body) {
+async function request(method, url, body, { raw = false, contentType } = {}) {
   const token = activeToken();
   const res = await fetch(url, {
     method,
     headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(raw ? { 'Content-Type': contentType } : (body ? { 'Content-Type': 'application/json' } : {})),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: raw ? body : (body ? JSON.stringify(body) : undefined),
   });
   let data = null;
   try { data = await res.json(); } catch { /* non-JSON response */ }
@@ -34,4 +34,6 @@ export const api = {
   put: (url, body) => request('PUT', url, body ?? {}),
   patch: (url, body) => request('PATCH', url, body),
   del: url => request('DELETE', url),
+  /** POSTs a file or other raw body as is. */
+  upload: (url, body, contentType) => request('POST', url, body, { raw: true, contentType }),
 };

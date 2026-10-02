@@ -51,3 +51,21 @@ test('a successful call returns the parsed body', async () => {
   respond(200, { ok: true });
   assert.deepEqual(await api.get('/x'), { ok: true });
 });
+
+test('upload sends the raw body with the given content type and the active token', async () => {
+  store.set('tessera_active', 'eva');
+  store.set('tessera_accounts', JSON.stringify([{ username: 'eva', role: 'EVENT_ADMIN', token: 'tok-1' }]));
+  let seen;
+  globalThis.fetch = async (url, init) => {
+    seen = { url, init };
+    return { ok: true, status: 200, json: async () => ({ updated: 2 }) };
+  };
+  const bytes = new Uint8Array([1, 2, 3]).buffer;
+  const result = await api.upload('/api/events/1/holders', bytes, 'text/csv');
+  assert.deepEqual(result, { updated: 2 });
+  assert.equal(seen.url, '/api/events/1/holders');
+  assert.equal(seen.init.method, 'POST');
+  assert.equal(seen.init.headers['Content-Type'], 'text/csv');
+  assert.equal(seen.init.headers.Authorization, 'Bearer tok-1');
+  assert.equal(seen.init.body, bytes, 'the body is passed through untouched');
+});
