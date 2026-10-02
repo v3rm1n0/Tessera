@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { db, pickSectionColor } from '../db.js';
 import { requireRole, requireEventAccess, requireSectionAccess, canAccessEvent } from '../auth.js';
+import { uniqueSheetName } from '../xlsx.js';
 
 /** Event Admin functionality: sections, UUIDs and QR codes are managed exclusively by the event's admins. */
 export const eventsRouter = Router();
@@ -254,9 +255,9 @@ eventsRouter.get('/events/:eventId/tickets.xlsx', manage, requireEventAccess, as
   const sections = db.prepare('SELECT * FROM sections WHERE event_id = ? ORDER BY name')
     .all(req.event.id);
   const wb = new ExcelJS.Workbook();
+  const usedSheetNames = new Set(['history']);
   for (const section of sections) {
-    // sheet names: max 31 chars, no \ / ? * [ ] :
-    const sheet = wb.addWorksheet(section.name.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Section');
+    const sheet = wb.addWorksheet(uniqueSheetName(section.name, usedSheetNames));
     sheet.columns = [
       { header: 'Section', key: 'section', width: 30 },
       { header: 'Subsection', key: 'subsection', width: 30 },
