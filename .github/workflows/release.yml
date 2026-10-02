@@ -9,7 +9,12 @@ permissions:
   contents: write
 
 jobs:
+  # nothing is released unless the tests pass for exactly this commit
+  test:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
